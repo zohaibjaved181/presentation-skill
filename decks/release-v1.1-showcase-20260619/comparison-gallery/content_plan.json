@@ -1,6 +1,6 @@
 {
   "topic": "Presentation Skill v1.1 Release Gallery",
-  "audience": "HN and GitHub release readers",
+  "audience": "GitHub release reviewers",
   "objective": "Show actual before/after slide improvements across multiple styles.",
   "thesis": "v1.1 adds structure, taste constraints, reproducible style variation, and QA-visible cleanliness.",
   "slide_plan": [

@@ -146,7 +146,6 @@ and this updated skill across 13 styles.
 Useful files:
 
 - `decks/release-v1.1-showcase-20260619/RELEASE_NOTES_v1.1.md`
-- `decks/release-v1.1-showcase-20260619/HN_POST_DRAFT.md`
 - `decks/release-v1.1-showcase-20260619/release_showcase_manifest.json`
 - `decks/release-v1.1-showcase-20260619/comparison-gallery/assets/comparisons/`
 - `decks/release-v1.1-showcase-20260619/comparison-gallery/build/presentation-skill-v1-1-release-gallery.pptx`

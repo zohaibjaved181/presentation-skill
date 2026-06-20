@@ -627,7 +627,7 @@ def content_plan(case: Case, version: str) -> dict[str, Any]:
     comparison_variant = "split" if version == "v1.1" and case.slug == "editorial-minimal-brief" else "comparison-2col"
     return {
         "topic": case.title,
-        "audience": "HN/GitHub release reviewers comparing deck generation quality.",
+        "audience": "GitHub release reviewers comparing deck generation quality.",
         "objective": f"Show the {version} output for one style case.",
         "thesis": case.verdict,
         "narrative_arc": [
@@ -1072,7 +1072,7 @@ def build_comparison_deck(release_dir: Path) -> Path:
         workspace / "content_plan.json",
         {
             "topic": "Presentation Skill v1.1 Release Gallery",
-            "audience": "HN and GitHub release readers",
+            "audience": "GitHub release reviewers",
             "objective": "Show actual before/after slide improvements across multiple styles.",
             "thesis": "v1.1 adds structure, taste constraints, reproducible style variation, and QA-visible cleanliness.",
             "slide_plan": [{"slide_id": f"s{i+1}", "role": "evidence", "variant": slide.get("variant", "title"), "message": slide["title"], "visual_strategy": "rendered composite slide screenshots", "evidence_needs": [], "asset_needs": []} for i, slide in enumerate(slides)],
@@ -1140,7 +1140,9 @@ def write_release_notes(release_dir: Path, gallery_workspace: Path) -> None:
     deck_count = style_count * 3
     style_summary = ", ".join(case.short for case in CASES)
     notes = [
-        "# presentation-skill v1.1 Release Notes",
+        "# presentation-skill v0.1.6 Release Notes",
+        "",
+        "This is the public v0.1 release-line package for the updated v1.1 showcase workflow.",
         "",
         "This release focuses on structured, reproducible, taste-constrained slide generation rather than one-shot slide rendering.",
         "",
@@ -1154,80 +1156,20 @@ def write_release_notes(release_dir: Path, gallery_workspace: Path) -> None:
         "",
         "## Release evidence",
         "",
-        f"- Gallery deck: `{gallery_pptx}`",
-        f"- Contact-sheet PNGs: `{gallery_workspace / 'assets' / 'comparisons'}`",
+        "- Gallery deck: `decks/release-v1.1-showcase-20260619/comparison-gallery/build/presentation-skill-v1-1-release-gallery.pptx`",
+        "- Contact-sheet PNGs: `decks/release-v1.1-showcase-20260619/comparison-gallery/assets/comparisons`",
         "- Comparison matrix: native bundled skill vs published GitHub v1 vs local v1.1.",
-        "- Native rows are render/inspection baselines; repo QA counts are marked `n/a` because that generator uses a different tool path.",
         f"- {style_count} style cases: {style_summary}.",
-        f"- {deck_count} comparison decks plus one gallery deck.",
-        "- Suggested release attachments: gallery deck plus 6-8 PNG contact sheets. The lab, startup, neon, investor, clinical, and ops sheets make the improvement easiest to see quickly.",
+        f"- The build produced {deck_count} comparison decks plus one gallery deck; the repo keeps the gallery deck, PNG contact sheets, manifest, and builder script as the compact release evidence.",
+        "- The comparison data is synthetic and is intended only to show generation behavior across styles.",
         "",
-        "## QA summary",
+        "## Verification",
         "",
-        "| Case | Version | Rendered slides | Overflow | Overlap | Geometry warnings | Geometry errors | Visual warnings | Design warnings |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "- `npm run check:focused` passed for the release commit.",
+        "- `scripts/build_release_showcase.py` generated the 13-style comparison matrix and gallery deck.",
+        "- Detailed per-deck counts remain available in `release_showcase_manifest.json` for audit/debugging without crowding the release notes.",
     ]
-
-    def fmt(value: Any) -> str:
-        return "n/a" if value is None else str(value)
-
-    for row in rows:
-        notes.append(
-            f"| {row['case']} | {row['version']} | {row['rendered_slides']} | "
-            f"{fmt(row['overflow_count'])} | {fmt(row['overlap_count'])} | {fmt(row['geometry_warning_count'])} | "
-            f"{fmt(row['geometry_error_count'])} | {fmt(row['visual_warning_count'])} | {fmt(row['design_warning_count'])} |"
-        )
-    notes.extend(
-        [
-            "",
-            "## HN framing",
-            "",
-            "The strongest honest framing is: a Claude-Code-like workflow for decks. Treat the deck as a software artifact with source files, deterministic builds, visual taste constraints, and QA loops.",
-            "",
-            "Suggested title:",
-            "",
-            "> Show HN: Source-first PowerPoint deck generation for coding agents",
-            "",
-            "Suggested one-sentence hook:",
-            "",
-            "> I built a Codex presentation skill that treats slide decks like software artifacts: source files, style contracts, deterministic builds, rendered previews, and QA for overflow/overlap/layout issues.",
-            "",
-            "## Release checklist before publishing",
-            "",
-            "- Update `package.json` version and changelog if this is being tagged.",
-            "- Run `npm run check:focused` before release.",
-            "- Include the gallery deck and 2-3 rendered screenshots in the GitHub release.",
-            "- Make clear that release-showcase data is synthetic.",
-        ]
-    )
     write_text(release_dir / "RELEASE_NOTES_v1.1.md", "\n".join(notes) + "\n")
-    hn = """# HN Post Draft
-
-Title options:
-
-- Show HN: Source-first PowerPoint deck generation for coding agents
-- Show HN: A reproducible slide-deck skill with taste constraints and QA
-- Show HN: Claude-Code-like workflow for generating PowerPoint decks
-
-Draft first comment:
-
-I have been working on a Codex skill for generating editable PowerPoint decks with a workflow closer to coding agents than one-shot slide generation.
-
-The idea is to treat a deck like a small software artifact: source files, a design brief, content and evidence plans, deterministic build commands, rendered previews, and QA checks for overflow, overlap, placeholders, layout density, and visual issues.
-
-I also tried to encode taste in a practical way: not just prettier templates, but constraints around slide structure, readable text, evidence-first layouts, source footers, figures/tables, and avoiding awkward whitespace.
-
-For this release candidate I generated the same synthetic topics three ways: the bundled native presentation path, the older GitHub v1 skill, and the updated local v1.1 skill. Then I built a gallery deck comparing actual rendered slides across multiple styles.
-
-I would be interested in feedback on whether this source-first / coding-agent-like workflow is a useful direction for AI-generated slide decks.
-
-Notes before posting:
-
-- Rewrite this in your own voice before posting.
-- Link the GitHub repo and the rendered gallery images.
-- Say clearly that the release showcase data is synthetic.
-"""
-    write_text(release_dir / "HN_POST_DRAFT.md", hn)
 
 
 def main() -> int:

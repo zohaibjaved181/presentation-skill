@@ -10,9 +10,8 @@ The showcase compares the same synthetic deck topics three ways:
 
 Checked-in artifacts:
 
-- `RELEASE_NOTES_v1.1.md`: release notes and QA summary
-- `HN_POST_DRAFT.md`: draft Show HN copy
-- `release_showcase_manifest.json`: reproducible manifest and QA metrics
+- `RELEASE_NOTES_v1.1.md`: release notes
+- `release_showcase_manifest.json`: reproducible manifest and audit metrics
 - `comparison-gallery/assets/comparisons/*.png`: 13 before/after contact sheets
 - `comparison-gallery/build/presentation-skill-v1-1-release-gallery.pptx`: editable gallery deck
 
