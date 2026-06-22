@@ -181,6 +181,46 @@ main agent must still record deterministic choices in the design contract:
 selected preset, source IDs, style seed, treatment mix, contact-sheet use cases,
 and safety statement.
 
+## Large Public Deck Corpus
+
+The large corpus is the scalable public-usage index behind dynamic style
+scouting:
+
+```bash
+python3 scripts/large_style_corpus.py --validate --min-records 2000 --min-family-records 10
+python3 scripts/large_style_corpus.py --compact-context \
+  --primary-family lab-report \
+  --prompt "assay validation report with generated figures and refs"
+```
+
+Its source manifest lives in
+`references/large_style_corpus_sources.json`; the generated catalog lives in
+`references/large_style_corpus_catalog.json`, with a human-readable digest in
+`references/large_style_corpus_catalog.md`. The discovery command uses public
+GitHub metadata routes for Slidev, Marp, reveal.js, PPTX, PDF, ODP, investor,
+lab, clinical, dashboard, risk, policy, workshop, and AI-agent deck signals.
+The catalog stores only URLs, repository/path metadata, inferred style
+families, content-treatment tags, and overlap/selection diagnostics. It does
+not store raw decks, screenshots, slide text, logos, or copied geometry.
+
+Use this layer when the curated preset examples feel too similar or when the
+prompt asks for a style family that should reflect real public usage. The
+LLM/subagent workflow is:
+
+- choose one primary style family from the compact corpus context
+- borrow at most two named treatment ideas from source records or secondary
+  families
+- translate those ideas into original synthetic layouts and supported renderer
+  variants
+- record the selected family, borrowed treatment names, style seed, and safety
+  statement in the design contract
+- replace redundant-looking presets by drawing from underrepresented family
+  summaries, not by copying a source deck
+
+AI-agent-created or AI-tooling deck records get a priority signal in the
+catalog because they are useful examples of agent-era structure, but they are
+subject to the same descriptor-only rule.
+
 ## Preset Contact-Sheet Collections
 
 Rendered style-reference galleries now include a browseable mini library under

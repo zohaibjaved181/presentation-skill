@@ -25,6 +25,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from large_style_corpus import compact_large_style_corpus_context
 from style_inspiration_corpus import compact_style_inspiration_context
 from style_reference_catalog import rank_style_references, style_reference_mix_plan
 from style_treatment_profiles import preset_treatment_profile
@@ -294,6 +295,75 @@ def _compact_footer_reference_contract(
     }
 
 
+def _compact_large_corpus_router_context(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict) or not payload.get("available"):
+        return payload
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    families: list[dict[str, Any]] = []
+    for item in payload.get("selected_family_summaries", [])[:3]:
+        if not isinstance(item, dict):
+            continue
+        descriptor = item.get("descriptor") if isinstance(item.get("descriptor"), dict) else {}
+        sample_sources = item.get("sample_sources") if isinstance(item.get("sample_sources"), list) else []
+        families.append(
+            {
+                "style_family": item.get("style_family"),
+                "record_count": item.get("record_count"),
+                "layout_tags": (descriptor.get("layout_tags") if isinstance(descriptor.get("layout_tags"), list) else [])[:4],
+                "content_treatments": (
+                    descriptor.get("content_treatments")
+                    if isinstance(descriptor.get("content_treatments"), list)
+                    else []
+                )[:4],
+                "top_deck_systems": item.get("top_deck_systems"),
+                "top_content_treatments": item.get("top_content_treatments"),
+                "sample_sources": [
+                    {
+                        "deck_id": sample.get("deck_id"),
+                        "deck_system": sample.get("deck_system"),
+                        "repository": sample.get("repository"),
+                        "path": sample.get("path"),
+                    }
+                    for sample in sample_sources[:2]
+                    if isinstance(sample, dict)
+                ],
+            }
+        )
+    samples: list[dict[str, Any]] = []
+    for record in payload.get("sample_records", [])[:4]:
+        if not isinstance(record, dict):
+            continue
+        samples.append(
+            {
+                "deck_id": record.get("deck_id"),
+                "deck_system": record.get("deck_system"),
+                "primary_style_family": record.get("primary_style_family"),
+                "descriptor_tags": (
+                    record.get("descriptor_tags") if isinstance(record.get("descriptor_tags"), list) else []
+                )[:5],
+                "content_treatments": (
+                    record.get("content_treatments") if isinstance(record.get("content_treatments"), list) else []
+                )[:5],
+                "source_url": record.get("source_url"),
+            }
+        )
+    return {
+        "catalog_version": payload.get("catalog_version"),
+        "available": True,
+        "policy": payload.get("policy"),
+        "summary": {
+            "record_count": summary.get("record_count"),
+            "unique_repository_count": summary.get("unique_repository_count"),
+            "ai_agent_signal_count": summary.get("ai_agent_signal_count"),
+            "style_family_counts": summary.get("style_family_counts"),
+            "deck_system_counts": summary.get("deck_system_counts"),
+        },
+        "selected_family_summaries": families,
+        "sample_records": samples,
+        "mixing_rule": payload.get("mixing_rule"),
+    }
+
+
 def _renderer_profile_for_preset(preset: Any) -> dict[str, Any]:
     key = str(preset or "").strip()
     if not key:
@@ -375,6 +445,12 @@ def _style_reference_match_context(text: str, *, limit: int = 22000) -> str:
         query,
         primary_preset=str(primary.get("style_preset") or ""),
     )
+    large_corpus_context = compact_large_style_corpus_context(
+        query,
+        primary_family=str(primary.get("style_preset") or ""),
+        max_records=6,
+    )
+    large_corpus_context = _compact_large_corpus_router_context(large_corpus_context)
     compact_mix = {
         "mix_plan_version": mix_plan.get("mix_plan_version"),
         "query_summary": _truncate(str(mix_plan.get("query") or ""), 700),
@@ -417,7 +493,9 @@ def _style_reference_match_context(text: str, *, limit: int = 22000) -> str:
                 "design DNA, layout playbook, content recipes, and renderer treatment pools. "
                 "Do not copy external/proprietary slide geometry. Use the descriptor-only "
                 "style inspiration corpus for broad source matching, then open the selected "
-                "preset contact-sheet collection use cases before borrowing any treatment ideas."
+                "preset contact-sheet collection use cases before borrowing any treatment ideas. "
+                "When available, use the large_style_corpus block as broad real-world pattern "
+                "evidence; it is still descriptor-only and never permits copying source decks."
             ),
             "style_inspiration_corpus": inspiration_context,
             "preset_contact_collection_contract": {
@@ -431,6 +509,7 @@ def _style_reference_match_context(text: str, *, limit: int = 22000) -> str:
             },
             "matches": compact_matches,
             "mix_plan": compact_mix,
+            "large_style_corpus": large_corpus_context,
         },
         limit,
     )
@@ -577,6 +656,15 @@ slide geometry. Use its selected routes and safety rules to decide which
 per-preset contact-sheet collection to browse (`overview`, `data_evidence`,
 or `decision_sources`) and where a treatment-specific secondary influence is
 worth recording.
+
+The `large_style_corpus` block, when available, is a larger descriptor-only
+index of public/open-source deck-like records. Use it to spot real-world
+presentation systems, underused treatment patterns, and style families that
+would make the current deck less generic. It is not a template gallery and it
+does not grant permission to copy or embed source decks. Borrow only abstract
+ideas such as "agent workflow comparison", "risk register table", "journal
+figure plate", or "product roadmap bands", then create original synthetic
+structure in the design contract and outline.
 
 Treat report structure and source/footer posture as first-class reproducibility
 contracts. Bind the selected reference's layout playbook to a concrete section

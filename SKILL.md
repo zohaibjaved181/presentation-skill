@@ -122,6 +122,18 @@ generator, slides generator, deck builder, presentation generator.
   layout/palette/typography descriptors, per-preset routes, and the safety rule
   that no raw decks, screenshots, logos, proprietary text, or distinctive
   copied geometry are bundled.
+- `references/large_style_corpus_sources.json`,
+  `references/large_style_corpus_catalog.json`, and
+  `scripts/large_style_corpus.py`: descriptor-only large public deck corpus
+  layer for real-world style discovery. Use it to index 2,000+ public/open
+  deck-like records, balance overlap, prioritize AI-agent/tooling examples,
+  emit compact LLM context, and replace redundant-looking preset treatments
+  with original synthetic structure. It stores only public URLs, repository/path
+  metadata, inferred style families, and descriptors; never raw decks,
+  screenshots, copied slide text, logos, or distinctive source geometry.
+- `scripts/run_large_style_corpus_smoke.py`: focused fast smoke proving the
+  large-corpus source manifest, descriptor schema, family coverage, compact
+  context, and digest writer stay usable without network access.
 - `scripts/build_style_reference_gallery.py`: generated reference-gallery
   decks that turn the synthetic style catalog into actual title, dashboard,
   comparison, chart, table, figure, decision, and references slides without
@@ -952,6 +964,9 @@ maps, generic-to-specific variant compatibility, or resolved-outline metadata,
 run `npm run check:style-reference-resolution`.
 When changing prompt-to-style routing, style/content scout output shape, or
 router subagent guidance, run `npm run check:style-router`.
+When changing the large public deck corpus source manifest, descriptor schema,
+overlap balancing, compact LLM context, or digest writer, run
+`npm run check:large-style-corpus`.
 When changing style pools, header variants, or seed handling, run
 `npm run check:style-mix` for a fast init/validate/build/readiness smoke plus
 lab-report header-variant gallery build/QA coverage before the full

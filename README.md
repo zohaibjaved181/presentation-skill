@@ -36,6 +36,9 @@ source is available.
 - Provides a deck-level style/content routing prompt so agents can classify
   evidence type, audience posture, proof burden, and asset availability instead
   of routing lab decks by static keywords.
+- Includes a descriptor-only public deck corpus with 2,000 indexed
+  deck-like records across 13 style families, so LLMs can browse real-world
+  presentation patterns without bundling raw third-party decks or screenshots.
 - Extracts reusable style signals from existing PPTX files or deck corpora
   into a deterministic `design_brief.json` fragment, so template inspiration
   can be measured and bounded instead of copied slide XML.
@@ -139,6 +142,17 @@ requirement for normal deck-generation tasks.
 ## Release Evidence Galleries
 
 The repo includes release evidence galleries for major style-system updates.
+
+The v0.3.0 large public deck corpus lives in `references/`:
+
+- `references/large_style_corpus_sources.json`
+- `references/large_style_corpus_catalog.json`
+- `references/large_style_corpus_catalog.md`
+
+It indexes 2,000 public/open deck-like records as URL/path metadata plus
+inferred style-family and content-treatment descriptors. It deliberately does
+not store raw third-party decks, screenshots, copied slide text, logos, or
+distinctive source geometry.
 
 The v0.2.0 style-reference corpus evidence is under
 `decks/style-reference-gallery-20260620-corpus-v1/`. It adds descriptor-only
