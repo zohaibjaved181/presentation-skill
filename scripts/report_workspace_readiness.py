@@ -869,6 +869,8 @@ def _artifact_selection_summary(
         "unbound_output_ids": output_ids,
         "slide_ids": [],
         "variants": [],
+        "treatment_keys": [],
+        "variant_sources": [],
     }
     if not path.exists():
         return summary
@@ -880,18 +882,26 @@ def _artifact_selection_summary(
     bound_output_ids: list[str] = []
     slide_ids: list[str] = []
     variants: list[str] = []
+    treatment_keys: list[str] = []
+    variant_sources: list[str] = []
     for binding in bindings:
         if not isinstance(binding, dict):
             continue
         output_id = str(binding.get("output_id") or binding.get("id") or "").strip()
         slide_id = str(binding.get("slide_id") or binding.get("target_slide") or "").strip()
         variant = str(binding.get("variant") or binding.get("slide_variant") or "").strip()
+        treatment_key = str(binding.get("treatment_key") or "").strip()
+        variant_source = str(binding.get("variant_source") or "").strip()
         if output_id and output_id not in bound_output_ids:
             bound_output_ids.append(output_id)
         if slide_id and slide_id not in slide_ids:
             slide_ids.append(slide_id)
         if variant and variant not in variants:
             variants.append(variant)
+        if treatment_key and treatment_key not in treatment_keys:
+            treatment_keys.append(treatment_key)
+        if variant_source and variant_source not in variant_sources:
+            variant_sources.append(variant_source)
     summary.update(
         {
             "binding_count": len([item for item in bindings if isinstance(item, dict)]),
@@ -899,6 +909,8 @@ def _artifact_selection_summary(
             "unbound_output_ids": [item for item in output_ids if item not in bound_output_ids],
             "slide_ids": slide_ids,
             "variants": variants,
+            "treatment_keys": treatment_keys,
+            "variant_sources": variant_sources,
         }
     )
     return summary
@@ -978,6 +990,8 @@ def _artifact_context_summary(
             "unbound_output_ids": _string_list(selection.get("unbound_output_ids")),
             "slide_ids": _string_list(selection.get("slide_ids")),
             "variants": _string_list(selection.get("variants")),
+            "treatment_keys": _string_list(selection.get("treatment_keys")),
+            "variant_sources": _string_list(selection.get("variant_sources")),
             "error": str(selection.get("error") or "").strip(),
         }
     tabular_paths = _string_list(tabular_data)
@@ -2118,6 +2132,7 @@ def _design_contract_summary(
                 "header_variant_pool": _string_list(style_replay.get("header_variant_pool")),
                 "footer_pool": _string_list(style_replay.get("footer_pool")),
                 "chart_treatment_pool": _string_list(style_replay.get("chart_treatment_pool")),
+                "table_treatment_pool": _string_list(style_replay.get("table_treatment_pool")),
                 "figure_table_treatment_pool": _string_list(
                     style_replay.get("figure_table_treatment_pool")
                 ),
@@ -2918,12 +2933,17 @@ def _outline_composition(workspace: Path, outline_path: Path) -> dict[str, Any]:
 
 
 def _starter_content_slide(slide: dict[str, Any]) -> bool:
-    return (
+    legacy_starter = (
         str(slide.get("slide_id") or "").strip() == "s2"
         and str(slide.get("type") or "").strip().lower() == "content"
         and str(slide.get("variant") or "").strip() == "split"
         and str(slide.get("title") or "").strip() == "Core message"
     )
+    style_reference_starter = (
+        str(slide.get("type") or "").strip().lower() == "content"
+        and str(slide.get("starter_kind") or "").strip() == "style_reference"
+    )
+    return legacy_starter or style_reference_starter
 
 
 def _outline_authored_from_contract(outline_composition: dict[str, Any]) -> bool:
@@ -4706,11 +4726,66 @@ def _resolved_treatment_markdown_lines(style: Any) -> list[str]:
         return []
     counts = summary.get("header_variant_counts")
     counts_text = json.dumps(counts, sort_keys=True) if isinstance(counts, dict) else "{}"
-    return [
+    lines = [
         "- Resolved header variants: "
         f"unique=`{int(summary.get('unique_header_variant_count') or 0)}` "
         f"counts=`{counts_text}`"
     ]
+    lines.extend(_style_reference_layout_markdown_lines(summary))
+    return lines
+
+
+def _style_reference_layout_markdown_lines(summary: Any) -> list[str]:
+    if not isinstance(summary, dict):
+        return []
+    layout = summary.get("style_reference_layout")
+    if not isinstance(layout, dict) or not layout:
+        return []
+    records = layout.get("variant_by_slide") if isinstance(layout.get("variant_by_slide"), list) else []
+    treatment_counts: dict[str, int] = {}
+    variant_counts: dict[str, int] = {}
+    recipe_signatures: set[str] = set()
+    recipe_versions: dict[str, int] = {}
+    slide_map: list[str] = []
+    for item in records:
+        if not isinstance(item, dict):
+            continue
+        treatment = str(item.get("treatment_key") or "").strip()
+        resolved_variant = str(item.get("resolved_variant") or "").strip()
+        recipe_signature = str(item.get("content_recipe_signature") or "").strip()
+        recipe_version = str(item.get("content_recipe_library_version") or "").strip()
+        if treatment:
+            treatment_counts[treatment] = treatment_counts.get(treatment, 0) + 1
+        if resolved_variant:
+            variant_counts[resolved_variant] = variant_counts.get(resolved_variant, 0) + 1
+        if recipe_signature:
+            recipe_signatures.add(recipe_signature)
+        if recipe_version:
+            recipe_versions[recipe_version] = recipe_versions.get(recipe_version, 0) + 1
+        if len(slide_map) < 8:
+            slide_id = str(item.get("slide_id") or "").strip() or f"s{len(slide_map) + 1}"
+            applied = "*" if item.get("applied") else ""
+            slide_map.append(f"{slide_id}:{treatment or 'unknown'}->{resolved_variant or 'unknown'}{applied}")
+    treatment_text = json.dumps(dict(sorted(treatment_counts.items())), sort_keys=True)
+    variant_text = json.dumps(dict(sorted(variant_counts.items())), sort_keys=True)
+    version_text = json.dumps(dict(sorted(recipe_versions.items())), sort_keys=True)
+    lines = [
+        "- Style-reference layouts: "
+        f"playbook=`{layout.get('playbook_version') or 'none'}` "
+        f"reference=`{layout.get('reference_id') or 'none'}` "
+        f"applied=`{_int_value(layout.get('applied_count'))}/{_int_value(layout.get('annotated_count'))}` "
+        f"skipped=`{_int_value(layout.get('skipped_count'))}` "
+        f"recipe_signatures=`{len(recipe_signatures)}`"
+    ]
+    if treatment_counts:
+        lines.append(f"- Style-reference treatments: `{treatment_text}`")
+    if variant_counts:
+        lines.append(f"- Style-reference variants: `{variant_text}`")
+    if recipe_versions:
+        lines.append(f"- Style-reference recipe versions: `{version_text}`")
+    if slide_map:
+        lines.append(f"- Style-reference slide map: `{', '.join(slide_map)}`")
+    return lines
 
 
 def _artifact_context_markdown_lines(manifest: Any, selection: Any) -> list[str]:
@@ -4764,7 +4839,8 @@ def _artifact_context_markdown_lines(manifest: Any, selection: Any) -> list[str]
             "- Bound artifact targets: "
             f"outputs=`{_markdown_list(selection.get('bound_output_ids'))}` "
             f"slides=`{_markdown_list(selection.get('slide_ids'))}` "
-            f"variants=`{_markdown_list(selection.get('variants'))}`"
+            f"variants=`{_markdown_list(selection.get('variants'))}` "
+            f"treatments=`{_markdown_list(selection.get('treatment_keys'))}`"
         )
     return lines
 
@@ -5136,7 +5212,7 @@ def _readiness_markdown(report: dict[str, Any]) -> str:
         f"commands=`{contract_quality.get('required_command_count', 0)}`",
         f"- Contract choice resolution: exists=`{bool(contract_choice.get('exists'))}` choices=`{_markdown_list(contract_choice.get('choice_ids'))}` active_routes=`{_markdown_list(contract_choice.get('active_routes'))}`",
         f"- Contract replay: exists=`{bool(contract_replay.get('exists'))}` seed=`{contract_replay.get('style_seed', '')}` renderer=`{contract_replay.get('renderer', '')}` commands=`{contract_replay.get('replay_command_count', 0)}` locked_fields=`{contract_replay.get('locked_design_field_count', 0)}`",
-        f"- Contract replay style: preset=`{contract_replay_style.get('style_preset', '')}` background=`{contract_replay_style.get('background_system', '')}` headers=`{_markdown_list(contract_replay_style.get('header_variant_pool'))}` charts=`{_markdown_list(contract_replay_style.get('chart_treatment_pool'))}` figures=`{_markdown_list(contract_replay_style.get('figure_table_treatment_pool'))}`",
+        f"- Contract replay style: preset=`{contract_replay_style.get('style_preset', '')}` background=`{contract_replay_style.get('background_system', '')}` headers=`{_markdown_list(contract_replay_style.get('header_variant_pool'))}` charts=`{_markdown_list(contract_replay_style.get('chart_treatment_pool'))}` tables=`{_markdown_list(contract_replay_style.get('table_treatment_pool'))}` figures=`{_markdown_list(contract_replay_style.get('figure_table_treatment_pool'))}`",
         f"- Contract acceptance evidence: `{contract_acceptance.get('existing_file_count', 0)}/{contract_acceptance.get('file_count', 0)}` files exist, missing=`{_markdown_list(contract_acceptance.get('missing_files'))}`",
         f"- Contract agent phases: `{_markdown_list(contract_agent_plan.get('phase_ids'))}` commands=`{contract_agent_plan.get('command_count', 0)}`",
         f"- Data analysis handoff status: `{data_handoff.get('status', 'none')}` applied=`{bool(data_handoff.get('applied'))}`",

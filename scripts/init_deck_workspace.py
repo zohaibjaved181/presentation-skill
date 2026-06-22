@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import struct
 import sys
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +16,17 @@ from pptx import Presentation
 
 from design_tokens import PRESETS
 from emit_deck_start_packet import build_packet
+from style_reference_catalog import LAYOUT_PLAYBOOK_VERSION, preset_style_reference
 from style_treatment_profiles import preset_treatment_profile
+
+
+STYLE_REFERENCE_ASSETS = {
+    "figure_a": "assets/style_reference/starter_figure_a.png",
+    "figure_b": "assets/style_reference/starter_figure_b.png",
+    "figure_c": "assets/style_reference/starter_figure_c.png",
+    "flow": "assets/style_reference/starter_flow.mmd",
+    "icon": "assets/icons/starter_icon.png",
+}
 
 
 def _slugify(value: str) -> str:
@@ -99,7 +111,15 @@ def _ensure_outline_slide_ids(outline: dict[str, Any]) -> list[dict[str, str]]:
         slide_type = str(slide.get("type") or "").strip()
         if not variant and slide_type and slide_type != "content":
             variant = slide_type
-        refs.append({"slide_id": slide_id, "variant": variant})
+        refs.append(
+            {
+                "slide_id": slide_id,
+                "variant": variant,
+                "title": str(slide.get("title") or "").strip(),
+                "starter_kind": str(slide.get("starter_kind") or "").strip(),
+                "treatment_key": str(slide.get("treatment_key") or "").strip(),
+            }
+        )
     return refs
 
 
@@ -136,7 +156,419 @@ def _reference_summary(reference_pptx: Path) -> dict[str, Any]:
     }
 
 
+def _story_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _story_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _compact_text(value: Any, fallback: str, *, limit: int = 64) -> str:
+    text = str(value or "").strip() or fallback
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)].rstrip(" -;:,") + "..."
+
+
+def _starter_base_slide(
+    *,
+    slide_id: str,
+    variant: str,
+    title: str,
+    subtitle: str,
+    reference: dict[str, Any],
+    treatment_key: str,
+) -> dict[str, Any]:
+    ref_id = str(reference.get("reference_id") or "style-reference").strip()
+    short_ref = ref_id[4:] if ref_id.startswith("ref-") else ref_id
+    return {
+        "slide_id": slide_id,
+        "type": "content",
+        "variant": variant,
+        "starter_kind": "style_reference",
+        "treatment_key": treatment_key,
+        "title": title,
+        "subtitle": subtitle,
+        "footer": "style-reference starter",
+        "sources": ["Synthetic style scaffold"],
+        "refs": [_compact_text(short_ref, "style-reference", limit=18)],
+    }
+
+
+def _chart_starter_slide(slide_id: str, reference: dict[str, Any]) -> dict[str, Any] | None:
+    story = _story_dict(reference.get("example_storyboard"))
+    chart = _story_dict(story.get("chart"))
+    labels = [str(item) for item in _story_list(chart.get("labels")) if str(item).strip()]
+    values = [
+        item
+        for item in _story_list(chart.get("values"))
+        if isinstance(item, (int, float)) and not isinstance(item, bool)
+    ]
+    if not labels or len(labels) != len(values):
+        return None
+    treatments = _story_dict(reference.get("content_treatments"))
+    title = _compact_text(chart.get("title"), f"{reference.get('reference_name', 'Reference')} chart", limit=58)
+    slide = _starter_base_slide(
+        slide_id=slide_id,
+        variant="chart",
+        title="Chart Scaffold",
+        subtitle=str(treatments.get("chart") or "Replace with the deck's real chart evidence."),
+        reference=reference,
+        treatment_key="chart",
+    )
+    slide["chart_treatment"] = "standard"
+    slide["chart"] = {
+        "type": "bar",
+        "title": title,
+        "labels": labels,
+        "values": values,
+        "notes": str(chart.get("note") or treatments.get("chart") or ""),
+        "options": {"showLegend": False, "catAxisLabelFontSize": 8, "valAxisLabelFontSize": 8},
+    }
+    return slide
+
+
+def _table_starter_slide(slide_id: str, reference: dict[str, Any], *, variant: str = "table") -> dict[str, Any] | None:
+    story = _story_dict(reference.get("example_storyboard"))
+    table = _story_dict(story.get("table"))
+    headers = [str(item) for item in _story_list(table.get("headers")) if str(item).strip()]
+    rows = [
+        [str(cell) for cell in row]
+        for row in _story_list(table.get("rows"))
+        if isinstance(row, list)
+    ]
+    if not headers or not rows:
+        return None
+    treatments = _story_dict(reference.get("content_treatments"))
+    slide = _starter_base_slide(
+        slide_id=slide_id,
+        variant="lab-run-results" if variant == "lab-run-results" else "table",
+        title="Table Scaffold",
+        subtitle=str(treatments.get("table") or "Replace rows with real evidence before delivery."),
+        reference=reference,
+        treatment_key="table",
+    )
+    slide["headers"] = headers
+    slide["rows"] = rows[:5]
+    slide["table_treatment"] = "compact-ledger"
+    slide["caption"] = "Synthetic style-reference rows; replace with source-backed data."
+    return slide
+
+
+def _comparison_starter_slide(slide_id: str, reference: dict[str, Any], *, variant: str = "comparison-2col") -> dict[str, Any] | None:
+    story = _story_dict(reference.get("example_storyboard"))
+    comparison = _story_dict(story.get("comparison"))
+    left_body = [str(item) for item in _story_list(comparison.get("left_body")) if str(item).strip()]
+    right_body = [str(item) for item in _story_list(comparison.get("right_body")) if str(item).strip()]
+    if not left_body and not right_body:
+        return None
+    treatments = _story_dict(reference.get("content_treatments"))
+    if variant == "split":
+        slide = _starter_base_slide(
+            slide_id=slide_id,
+            variant="split",
+            title="Contrast Scaffold",
+            subtitle=str(treatments.get("comparison") or "Replace with the deck's real contrast."),
+            reference=reference,
+            treatment_key="comparison",
+        )
+        slide["bullets"] = left_body[:2] + right_body[:2]
+        slide["highlights_label"] = str(comparison.get("right_title") or "Reference move")
+        slide["highlights"] = [str(comparison.get("verdict") or "Use the contrast to make the decision visible.")]
+        return slide
+    slide = _starter_base_slide(
+        slide_id=slide_id,
+        variant="comparison-2col",
+        title="Comparison Scaffold",
+        subtitle=str(treatments.get("comparison") or "Replace with the deck's real comparison."),
+        reference=reference,
+        treatment_key="comparison",
+    )
+    slide["left"] = {"title": str(comparison.get("left_title") or "Before"), "body": left_body or ["Current state"]}
+    slide["right"] = {"title": str(comparison.get("right_title") or "After"), "body": right_body or ["Target state"]}
+    slide["verdict"] = str(comparison.get("verdict") or "Make the chosen state explicit.")
+    return slide
+
+
+def _dashboard_starter_slide(slide_id: str, reference: dict[str, Any], *, variant: str = "stats") -> dict[str, Any] | None:
+    story = _story_dict(reference.get("example_storyboard"))
+    treatments = _story_dict(reference.get("content_treatments"))
+    if variant == "kpi-hero":
+        kpi = _story_dict(story.get("kpi"))
+        if not kpi.get("value") or not kpi.get("label"):
+            return None
+        slide = _starter_base_slide(
+            slide_id=slide_id,
+            variant="kpi-hero",
+            title="Hero Metric Scaffold",
+            subtitle=str(treatments.get("dashboard") or "Use only when one metric carries the point."),
+            reference=reference,
+            treatment_key="dashboard",
+        )
+        slide["value"] = str(kpi.get("value"))
+        slide["label"] = str(kpi.get("label"))
+        slide["context"] = str(kpi.get("context") or "Replace with a source-backed metric.")
+        return slide
+    facts = [
+        {
+            "value": str(item.get("value") or ""),
+            "label": str(item.get("label") or ""),
+            "detail": str(item.get("detail") or ""),
+        }
+        for item in _story_list(story.get("dashboard_facts"))
+        if isinstance(item, dict)
+    ]
+    facts = [item for item in facts if item["value"] or item["label"]]
+    if not facts:
+        return None
+    slide = _starter_base_slide(
+        slide_id=slide_id,
+        variant="stats",
+        title="Dashboard Scaffold",
+        subtitle=str(treatments.get("dashboard") or "Replace with real operating facts."),
+        reference=reference,
+        treatment_key="dashboard",
+    )
+    slide["facts"] = facts[:3]
+    slide["assets"] = {"icons": [STYLE_REFERENCE_ASSETS["icon"]] * min(3, len(facts))}
+    return slide
+
+
+def _timeline_starter_slide(slide_id: str, reference: dict[str, Any]) -> dict[str, Any] | None:
+    story = _story_dict(reference.get("example_storyboard"))
+    milestones = [
+        {
+            "label": str(item.get("label") or ""),
+            "title": str(item.get("title") or ""),
+            "body": str(item.get("body") or ""),
+        }
+        for item in _story_list(story.get("timeline"))
+        if isinstance(item, dict)
+    ]
+    milestones = [item for item in milestones if item["title"] or item["body"]]
+    if not milestones:
+        return None
+    slide = _starter_base_slide(
+        slide_id=slide_id,
+        variant="timeline",
+        title="Sequence Scaffold",
+        subtitle="Use this only when sequence changes the decision.",
+        reference=reference,
+        treatment_key="decision",
+    )
+    slide["milestones"] = milestones[:4]
+    return slide
+
+
+def _matrix_starter_slide(slide_id: str, reference: dict[str, Any]) -> dict[str, Any] | None:
+    story = _story_dict(reference.get("example_storyboard"))
+    quadrants = [
+        {"title": str(item.get("title") or ""), "body": str(item.get("body") or "")}
+        for item in _story_list(story.get("quadrants"))
+        if isinstance(item, dict)
+    ]
+    quadrants = [item for item in quadrants if item["title"] or item["body"]]
+    if len(quadrants) < 2:
+        return None
+    slide = _starter_base_slide(
+        slide_id=slide_id,
+        variant="matrix",
+        title="Tradeoff Scaffold",
+        subtitle=str(_story_dict(reference.get("content_treatments")).get("comparison") or "Replace with a real decision matrix."),
+        reference=reference,
+        treatment_key="comparison",
+    )
+    slide["quadrants"] = quadrants[:4]
+    slide["assets"] = {"icons": [STYLE_REFERENCE_ASSETS["icon"]] * min(4, len(slide["quadrants"]))}
+    return slide
+
+
+def _figure_sidebar_sections(reference: dict[str, Any]) -> list[dict[str, Any]]:
+    story = _story_dict(reference.get("example_storyboard"))
+    figure = _story_dict(story.get("figure"))
+    sections: list[dict[str, Any]] = []
+    for item in _story_list(figure.get("sections")):
+        if not isinstance(item, dict):
+            continue
+        title = _compact_text(item.get("title"), "Readout", limit=20)
+        lines = [
+            _compact_text(line, "Replace with figure evidence.", limit=52)
+            for line in _story_list(item.get("body"))
+            if str(line).strip()
+        ]
+        if title and lines:
+            sections.append({"title": title, "body": lines[:2]})
+    if sections:
+        return sections[:3]
+    return [
+        {"title": "Readout", "body": ["One local figure owns the proof."]},
+        {"title": "Interpretation", "body": ["Sidebar explains why it matters."]},
+    ]
+
+
+def _figure_starter_slide(slide_id: str, reference: dict[str, Any], *, variant: str) -> dict[str, Any] | None:
+    story = _story_dict(reference.get("example_storyboard"))
+    figure = _story_dict(story.get("figure"))
+    treatments = _story_dict(reference.get("content_treatments"))
+    caption = _compact_text(
+        figure.get("caption"),
+        "Synthetic starter figure; replace with source-backed evidence.",
+        limit=86,
+    )
+    interpretation = _compact_text(
+        figure.get("interpretation"),
+        "Use this figure grammar as style memory, then replace the evidence.",
+        limit=92,
+    )
+    if variant == "flow":
+        slide = _starter_base_slide(
+            slide_id=slide_id,
+            variant="flow",
+            title="Flow Scaffold",
+            subtitle=str(treatments.get("figure") or "Replace with a real process diagram."),
+            reference=reference,
+            treatment_key="figure",
+        )
+        slide["assets"] = {"mermaid_source": STYLE_REFERENCE_ASSETS["flow"]}
+        slide["sidebar_sections"] = _figure_sidebar_sections(reference)[:2]
+        slide["summary_callout"] = interpretation
+        slide["caption"] = caption
+        return slide
+    if variant == "scientific-figure":
+        slide = _starter_base_slide(
+            slide_id=slide_id,
+            variant="scientific-figure",
+            title="Figure Panels Scaffold",
+            subtitle=str(treatments.get("figure") or "Replace with real figure panels."),
+            reference=reference,
+            treatment_key="figure",
+        )
+        slide["figures"] = [
+            {"path": STYLE_REFERENCE_ASSETS["figure_a"], "label": "A", "title": "Signal", "caption": "Starter panel"},
+            {"path": STYLE_REFERENCE_ASSETS["figure_b"], "label": "B", "title": "Contrast", "caption": "Starter panel"},
+        ]
+        slide["caption"] = caption
+        slide["interpretation"] = interpretation
+        return slide
+    slide = _starter_base_slide(
+        slide_id=slide_id,
+        variant="image-sidebar",
+        title="Figure Sidebar Scaffold",
+        subtitle=str(treatments.get("figure") or "Replace with a real figure and interpretation."),
+        reference=reference,
+        treatment_key="figure",
+    )
+    slide["assets"] = {"hero_image": STYLE_REFERENCE_ASSETS["figure_a"]}
+    slide["image_side"] = "left"
+    slide["sidebar_sections"] = _figure_sidebar_sections(reference)
+    slide["caption"] = caption
+    return slide
+
+
+def _cards_starter_slide(slide_id: str, reference: dict[str, Any], *, variant: str = "cards-3") -> dict[str, Any] | None:
+    treatments = _story_dict(reference.get("content_treatments"))
+    cards = [
+        {
+            "title": "Claim",
+            "body": _compact_text(treatments.get("title"), "One clear claim opens the section.", limit=76),
+            "accent": "accent_primary",
+        },
+        {
+            "title": "Proof",
+            "body": _compact_text(treatments.get("chart"), "Attach one evidence object.", limit=76),
+            "accent": "accent_secondary",
+        },
+        {
+            "title": "Decision",
+            "body": _compact_text(treatments.get("decision"), "State the implication.", limit=76),
+            "accent": "accent_primary",
+        },
+    ]
+    slide = _starter_base_slide(
+        slide_id=slide_id,
+        variant="cards-2" if variant == "cards-2" else "cards-3",
+        title="Proof-Block Scaffold",
+        subtitle="Use cards only when the content is genuinely parallel.",
+        reference=reference,
+        treatment_key="dashboard",
+    )
+    slide["cards"] = cards[:2] if variant == "cards-2" else cards
+    slide["assets"] = {"icons": [STYLE_REFERENCE_ASSETS["icon"]] * len(slide["cards"])}
+    if variant != "cards-2":
+        slide["promote_card"] = 0
+    return slide
+
+
+def _starter_slide_for_variant(slide_id: str, variant: str, reference: dict[str, Any]) -> dict[str, Any] | None:
+    normalized = str(variant or "").strip().lower()
+    if normalized == "chart":
+        return _chart_starter_slide(slide_id, reference)
+    if normalized in {"table", "lab-run-results"}:
+        return _table_starter_slide(slide_id, reference, variant=normalized)
+    if normalized in {"comparison-2col", "split"}:
+        return _comparison_starter_slide(slide_id, reference, variant=normalized)
+    if normalized in {"stats", "kpi-hero"}:
+        return _dashboard_starter_slide(slide_id, reference, variant=normalized)
+    if normalized == "timeline":
+        return _timeline_starter_slide(slide_id, reference)
+    if normalized == "matrix":
+        return _matrix_starter_slide(slide_id, reference)
+    if normalized in {"cards-2", "cards-3"}:
+        return _cards_starter_slide(slide_id, reference, variant=normalized)
+    if normalized in {"image-sidebar", "scientific-figure", "flow"}:
+        return _figure_starter_slide(slide_id, reference, variant=normalized)
+    return None
+
+
+def _style_reference_starter_slides(style_preset: str, *, start_index: int = 3, max_slides: int = 3) -> list[dict[str, Any]]:
+    reference = preset_style_reference(style_preset)
+    playbook = _story_dict(reference.get("layout_playbook"))
+    showcase = [
+        str(item).strip().lower()
+        for item in _story_list(playbook.get("gallery_showcase_variants"))
+        if str(item).strip()
+    ]
+    preferred = [
+        str(item).strip().lower()
+        for item in _story_list(playbook.get("preferred_variants"))
+        if str(item).strip()
+    ]
+    fallbacks = ["chart", "table", "comparison-2col", "stats", "timeline", "matrix", "kpi-hero", "cards-3"]
+    candidates: list[str] = []
+    for variant in [*showcase, *preferred, *fallbacks]:
+        if variant not in candidates:
+            candidates.append(variant)
+    slides: list[dict[str, Any]] = []
+    treatment_keys: set[str] = set()
+    skip_default_starter_variants = {
+        "generated-image",
+        "timeline",
+    }
+    skip_by_preset = {
+        "sunset-investor": {"kpi-hero"},
+        "warm-terracotta": {"cards-2", "split"},
+    }
+    for variant in candidates:
+        if variant in skip_default_starter_variants or variant in skip_by_preset.get(style_preset, set()):
+            continue
+        slide_id = f"s{start_index + len(slides)}"
+        slide = _starter_slide_for_variant(slide_id, variant, reference)
+        if not slide:
+            continue
+        key = str(slide.get("treatment_key") or variant)
+        if key in treatment_keys and len(slides) >= 2:
+            continue
+        treatment_keys.add(key)
+        slides.append(slide)
+        if len(slides) >= max_slides:
+            break
+    return slides
+
+
 def _starter_outline(title: str, style_preset: str, font_pair: str | None, palette_key: str | None) -> dict[str, Any]:
+    reference = preset_style_reference(style_preset)
+    playbook = _story_dict(reference.get("layout_playbook"))
     deck_style: dict[str, Any] = {
         "visual_density": "medium",
         "emoji_mode": "none",
@@ -149,12 +581,28 @@ def _starter_outline(title: str, style_preset: str, font_pair: str | None, palet
         "title": title,
         "subtitle": "Working outline",
         "deck_style": deck_style,
+        "metadata": {
+            "starter_outline_version": "style_reference_starter_outline_v1",
+            "starter_outline_status": "synthetic_scaffold_replace_before_delivery",
+            "style_reference": {
+                "catalog_version": reference.get("catalog_version"),
+                "reference_id": reference.get("reference_id"),
+                "reference_name": reference.get("reference_name"),
+                "playbook_version": playbook.get("playbook_version"),
+                "style_metric_profile": reference.get("style_metric_profile"),
+            },
+        },
         "slides": [
             {
                 "slide_id": "s1",
                 "type": "title",
                 "title": title,
-                "subtitle": "Prepare notes, assets, and outline before building",
+                "subtitle": str(reference.get("style_dna") or "Prepare notes, assets, and outline before building"),
+                "chips": [
+                    _compact_text(style_preset, "style preset", limit=18),
+                    _compact_text(reference.get("reference_name"), "style ref", limit=18),
+                    "playbook-v1" if playbook.get("playbook_version") == LAYOUT_PLAYBOOK_VERSION else str(playbook.get("playbook_version") or "playbook"),
+                ],
             },
             {
                 "slide_id": "s2",
@@ -174,6 +622,7 @@ def _starter_outline(title: str, style_preset: str, font_pair: str | None, palet
                     "QA blocks overlap, overflow, and sparse layouts.",
                 ],
             },
+            *_style_reference_starter_slides(style_preset),
         ],
     }
 
@@ -181,6 +630,131 @@ def _starter_outline(title: str, style_preset: str, font_pair: str | None, palet
 def _write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def _hex_rgb(value: Any, fallback: tuple[int, int, int]) -> tuple[int, int, int]:
+    text = str(value or "").strip().lstrip("#")
+    if len(text) != 6:
+        return fallback
+    try:
+        return (int(text[0:2], 16), int(text[2:4], 16), int(text[4:6], 16))
+    except ValueError:
+        return fallback
+
+
+def _blend_rgb(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
+    return tuple(max(0, min(255, int(round(x + (y - x) * t)))) for x, y in zip(a, b))
+
+
+def _png_chunk(kind: bytes, payload: bytes) -> bytes:
+    return (
+        struct.pack(">I", len(payload))
+        + kind
+        + payload
+        + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
+    )
+
+
+def _write_synthetic_png(
+    path: Path,
+    *,
+    bg: tuple[int, int, int],
+    surface: tuple[int, int, int],
+    accent: tuple[int, int, int],
+    accent_2: tuple[int, int, int],
+    width: int = 960,
+    height: int = 540,
+) -> None:
+    pixels = bytearray(bg * width * height)
+
+    def rect(x0: int, y0: int, x1: int, y1: int, color: tuple[int, int, int]) -> None:
+        x0c, y0c = max(0, x0), max(0, y0)
+        x1c, y1c = min(width, x1), min(height, y1)
+        for y in range(y0c, y1c):
+            row = y * width * 3
+            for x in range(x0c, x1c):
+                offset = row + x * 3
+                pixels[offset : offset + 3] = bytes(color)
+
+    rect(38, 36, width - 38, height - 36, surface)
+    rect(70, 74, width - 70, 82, accent)
+    rect(70, height - 92, width - 70, height - 86, _blend_rgb(accent, surface, 0.42))
+    panel_w = (width - 180) // 3
+    for idx in range(3):
+        x = 70 + idx * (panel_w + 20)
+        y = 120
+        rect(x, y, x + panel_w, y + 250, _blend_rgb(surface, bg, 0.16))
+        rect(x, y, x + panel_w, y + 5, accent if idx % 2 == 0 else accent_2)
+        for bar_idx, value in enumerate((0.42, 0.68, 0.54, 0.78)):
+            bar_x = x + 28 + bar_idx * 44
+            bar_h = int(160 * value)
+            rect(bar_x, y + 212 - bar_h, bar_x + 25, y + 212, accent if bar_idx % 2 == 0 else accent_2)
+        rect(x + 28, y + 224, x + panel_w - 28, y + 229, _blend_rgb(bg, accent, 0.35))
+    for idx, value in enumerate((0.74, 0.56, 0.83, 0.65)):
+        x = 86 + idx * 205
+        rect(x, 418, x + int(120 * value), 434, accent if idx % 2 == 0 else accent_2)
+        rect(x, 446, x + 148, 452, _blend_rgb(bg, surface, 0.42))
+
+    raw = b"".join(
+        b"\x00" + bytes(pixels[y * width * 3 : (y + 1) * width * 3])
+        for y in range(height)
+    )
+    payload = (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + _png_chunk(b"IDAT", zlib.compress(raw, 9))
+        + _png_chunk(b"IEND", b"")
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists() or path.read_bytes() != payload:
+        path.write_bytes(payload)
+
+
+def _write_style_reference_assets(workspace: Path, style_preset: str) -> dict[str, str]:
+    preset = PRESETS[style_preset]
+    palette = preset.palette
+    bg = _hex_rgb(palette.get("bg"), (248, 250, 252))
+    surface = _hex_rgb(palette.get("surface"), (255, 255, 255))
+    accent = _hex_rgb(palette.get("accent_primary"), (37, 99, 235))
+    accent_2 = _hex_rgb(palette.get("accent_secondary"), (14, 165, 233))
+    style_dir = workspace / "assets" / "style_reference"
+    figure_paths = [
+        style_dir / "starter_figure_a.png",
+        style_dir / "starter_figure_b.png",
+        style_dir / "starter_figure_c.png",
+    ]
+    for idx, path in enumerate(figure_paths):
+        _write_synthetic_png(
+            path,
+            bg=bg,
+            surface=surface,
+            accent=accent if idx != 1 else accent_2,
+            accent_2=accent_2 if idx != 1 else accent,
+        )
+    flow_path = style_dir / "starter_flow.mmd"
+    _write_text(
+        flow_path,
+        "flowchart LR\n"
+        "  A[Input] --> B[Check]\n"
+        "  B --> C[Route]\n"
+        "  C --> D[Output]\n",
+    )
+    _write_synthetic_png(
+        workspace / STYLE_REFERENCE_ASSETS["icon"],
+        bg=surface,
+        surface=_blend_rgb(surface, accent, 0.12),
+        accent=accent,
+        accent_2=accent_2,
+        width=256,
+        height=256,
+    )
+    return {
+        "figure_a": "assets/style_reference/starter_figure_a.png",
+        "figure_b": "assets/style_reference/starter_figure_b.png",
+        "figure_c": "assets/style_reference/starter_figure_c.png",
+        "flow": "assets/style_reference/starter_flow.mmd",
+        "icon": STYLE_REFERENCE_ASSETS["icon"],
+    }
 
 
 def _workspace_readme(slug: str, title: str) -> str:
@@ -278,6 +852,12 @@ python3 ../../scripts/build_workspace.py --workspace . --allow-network-assets --
 
 def _workspace_notes(title: str, style_preset: str) -> str:
     preset = PRESETS[style_preset]
+    style_reference = preset_style_reference(style_preset)
+    playbook = _story_dict(style_reference.get("layout_playbook"))
+    metric_profile = _story_dict(style_reference.get("style_metric_profile"))
+    body_budget = metric_profile.get("body_words_per_content_slide")
+    body_budget_text = ", ".join(str(item) for item in body_budget) if isinstance(body_budget, list) else ""
+    content_treatments = _story_dict(style_reference.get("content_treatments"))
     return f"""# {title} Notes
 
 ## Purpose
@@ -285,6 +865,9 @@ def _workspace_notes(title: str, style_preset: str) -> str:
 - Audience:
 - Decision / outcome:
 - Style preset: `{style_preset}`
+- Style reference: `{style_reference.get("reference_id")}` / {style_reference.get("reference_name")}
+- Style metrics: `{metric_profile.get("metric_profile_version")}`; density `{metric_profile.get("density_level")}`; whitespace target `{metric_profile.get("whitespace_ratio_target")}`; body-word budget `{body_budget_text}`.
+- Starter scaffold: `style_reference_starter_outline_v1` synthetic examples; replace before delivery.
 
 ## Sources
 
@@ -317,6 +900,11 @@ connected to the staging plan yet.
 - Body font: {preset.typography.body_max}-{preset.typography.body_min}pt range via preset
 - Margin x: {preset.layout.margin_x}
 - Gutter: {preset.layout.gutter}
+- Style DNA: {style_reference.get("style_dna")}
+- Preferred variants: {", ".join(str(item) for item in _story_list(playbook.get("preferred_variants"))[:8])}
+- Chart treatment: {content_treatments.get("chart", "")}
+- Table treatment: {content_treatments.get("table", "")}
+- Decision treatment: {content_treatments.get("decision", "")}
 
 ## QA Notes
 
@@ -342,59 +930,119 @@ def _display_path(workspace: Path, path: Path) -> str:
         return str(path.resolve())
 
 
+def _slide_role_from_ref(ref: dict[str, str], index: int) -> str:
+    variant = str(ref.get("variant") or "").strip().lower()
+    treatment = str(ref.get("treatment_key") or "").strip().lower()
+    if variant == "title" or index == 0:
+        return "title"
+    if treatment in {"chart", "table", "figure", "dashboard"}:
+        return "evidence"
+    if treatment == "comparison" or variant in {"comparison-2col", "split", "matrix"}:
+        return "comparison"
+    if variant in {"timeline", "flow"}:
+        return "sequence"
+    if treatment == "decision" or variant == "standard":
+        return "decision"
+    return "setup"
+
+
+def _visual_strategy_from_ref(ref: dict[str, str]) -> str:
+    variant = str(ref.get("variant") or "").strip().lower()
+    strategies = {
+        "title": "title opener with preset-specific style reference chips",
+        "split": "structured two-column contrast or setup",
+        "chart": "editable chart scaffold from the preset's synthetic storyboard",
+        "table": "editable table scaffold from the preset's content-treatment grammar",
+        "lab-run-results": "compact lab/report results table scaffold",
+        "comparison-2col": "two-column comparison with visible verdict",
+        "stats": "dashboard fact tiles with short readouts",
+        "kpi-hero": "single hero metric rhythm break",
+        "timeline": "milestone sequence only when order matters",
+        "matrix": "2x2 decision or tradeoff matrix",
+        "cards-2": "two parallel proof blocks only when content is genuinely paired",
+        "cards-3": "parallel proof blocks, not default decoration",
+        "image-sidebar": "local starter figure plus interpretation sidebar",
+        "scientific-figure": "multi-panel starter figure grid with caption and interpretation",
+        "flow": "local Mermaid process diagram with sidebar interpretation",
+    }
+    return strategies.get(variant, "preset-specific evidence or synthesis scaffold")
+
+
 def _content_plan_stub(title: str, slide_refs: list[dict[str, str]] | None = None) -> dict[str, Any]:
-    first_ref = slide_refs[0] if slide_refs else {}
-    second_ref = slide_refs[1] if slide_refs and len(slide_refs) > 1 else {}
-    first_slide_id = first_ref.get("slide_id") or "s1"
-    second_slide_id = second_ref.get("slide_id") or "s2"
-    first_variant = first_ref.get("variant") or "title"
-    second_variant = second_ref.get("variant") or "split"
+    refs = slide_refs or [{"slide_id": "s1", "variant": "title"}, {"slide_id": "s2", "variant": "split"}]
+    first_slide_id = refs[0].get("slide_id") or "s1"
+    setup_ids = [ref.get("slide_id") or f"s{index + 1}" for index, ref in enumerate(refs[:2])]
+    evidence_ids = [
+        ref.get("slide_id") or f"s{index + 1}"
+        for index, ref in enumerate(refs)
+        if index >= 2 and _slide_role_from_ref(ref, index) in {"evidence", "comparison", "sequence"}
+    ]
+    implication_ids = [
+        ref.get("slide_id") or f"s{index + 1}"
+        for index, ref in enumerate(refs)
+        if index >= 2 and _slide_role_from_ref(ref, index) == "decision"
+    ]
+    if not implication_ids and refs:
+        last_id = refs[-1].get("slide_id") or f"s{len(refs)}"
+        if last_id not in evidence_ids and last_id not in setup_ids:
+            implication_ids = [last_id]
+    slide_plan = []
+    for index, ref in enumerate(refs):
+        slide_id = ref.get("slide_id") or f"s{index + 1}"
+        variant = ref.get("variant") or ("title" if index == 0 else "standard")
+        role = _slide_role_from_ref(ref, index)
+        title_text = ref.get("title") or ("Open the deck" if index == 0 else "Replace scaffold content")
+        starter_kind = ref.get("starter_kind") or ""
+        slide_plan.append(
+            {
+                "slide_id": slide_id,
+                "role": role,
+                "message": (
+                    "Replace this synthetic style-reference scaffold with topic-specific content."
+                    if starter_kind == "style_reference"
+                    else (
+                        "Start from a durable workspace, not one-off inline code."
+                        if index == 0
+                        else "The durable source files are the contract for future edits."
+                    )
+                ),
+                "variant": variant,
+                "visual_strategy": _visual_strategy_from_ref(ref),
+                "evidence_needs": [] if starter_kind != "style_reference" else ["replace_synthetic_style_reference_content"],
+                "asset_needs": [],
+                "source_status": "synthetic_style_reference_scaffold" if starter_kind == "style_reference" else "workspace_starter",
+                "outline_title": title_text,
+            }
+        )
     return {
         "topic": title,
         "audience": "Deck author using the presentation-skill workspace scaffold.",
         "objective": "Replace the starter content with topic-specific narrative, evidence, and assets.",
-        "thesis": "A reliable deck starts with a content plan, sourced evidence, staged visuals, and QA before delivery.",
+        "thesis": "A reliable deck starts with a preset-specific style reference, sourced evidence, staged visuals, and QA before delivery.",
         "narrative_arc": [
             {
                 "act": "setup",
                 "purpose": "Frame why the topic matters.",
-                "slides": [first_slide_id],
+                "slides": setup_ids,
             },
             {
-                "act": "source-first setup",
-                "purpose": "Show how source-first authoring keeps later edits clean without prescribing a diagram.",
-                "slides": [second_slide_id],
+                "act": "style-reference scaffold",
+                "purpose": "Show the selected preset's reusable chart, table, comparison, dashboard, or sequence grammar before topic-specific authoring.",
+                "slides": evidence_ids,
             },
             {
                 "act": "implication",
                 "purpose": "Close with what the audience should remember or do.",
-                "slides": [],
+                "slides": implication_ids,
             },
         ],
-        "slide_plan": [
-            {
-                "slide_id": first_slide_id,
-                "role": "title",
-                "message": "Start from a durable workspace, not one-off inline code.",
-                "variant": first_variant,
-                "visual_strategy": "title opener with disciplined spacing",
-                "evidence_needs": [],
-                "asset_needs": [],
-            },
-            {
-                "slide_id": second_slide_id,
-                "role": "setup",
-                "message": "The durable source files are the contract for future edits.",
-                "variant": second_variant,
-                "visual_strategy": "two-column split with dense highlight panel",
-                "evidence_needs": [],
-                "asset_needs": [],
-            },
-        ],
+        "slide_plan": slide_plan,
         "design_notes": {
             "style_preset_reason": "Starter uses the requested preset while keeping typography and spacing conservative.",
             "rhythm_break": "Add a diagram, figure, table, or image only when the deck topic makes it useful.",
             "visual_motif": "Source-first authoring with clear stage labels when the author chooses a process visual.",
+            "starter_slide_id": first_slide_id,
+            "style_reference_scaffold": "Slides marked source_status=synthetic_style_reference_scaffold are style memory only and should be replaced before final delivery.",
         },
     }
 
@@ -402,6 +1050,13 @@ def _content_plan_stub(title: str, slide_refs: list[dict[str, str]] | None = Non
 def _design_brief_stub(title: str, style_preset: str) -> dict[str, Any]:
     preset = PRESETS[style_preset]
     treatment_profile = preset_treatment_profile(style_preset)
+    style_reference = preset_style_reference(style_preset)
+    playbook = _story_dict(style_reference.get("layout_playbook"))
+    preferred_variants = [
+        str(item)
+        for item in _story_list(playbook.get("preferred_variants"))
+        if str(item).strip()
+    ]
     return {
         "topic": title,
         "content_maturity": "serious/work",
@@ -439,6 +1094,7 @@ def _design_brief_stub(title: str, style_preset: str) -> dict[str, Any]:
             "style_preset": style_preset,
             "style_seed": f"{_slugify(title)}-{style_preset}",
             "preset_treatment_profile": treatment_profile,
+            "style_reference": style_reference,
             "style_mix_matrix": treatment_profile["style_mix_matrix"],
         },
         "title_page_concept": {
@@ -450,7 +1106,8 @@ def _design_brief_stub(title: str, style_preset: str) -> dict[str, Any]:
         "structure_strategy": {
             "primary_scaffold": "open editorial content slides with measured headers",
             "repeated_elements": ["shared margins", "consistent source/footer treatment", "limited accent rails"],
-            "allowed_variations": [
+            "allowed_variations": preferred_variants
+            or [
                 "standard clean report slides",
                 "split",
                 "cards-2",
@@ -462,6 +1119,13 @@ def _design_brief_stub(title: str, style_preset: str) -> dict[str, Any]:
                 "flow",
                 "generated-image",
             ],
+            "style_reference_layout_playbook": {
+                "playbook_version": playbook.get("playbook_version"),
+                "reference_id": playbook.get("reference_id"),
+                "opening_sequence": playbook.get("opening_sequence"),
+                "content_rules": playbook.get("content_rules"),
+                "avoid_variants": playbook.get("avoid_variants"),
+            },
             "container_policy": (
                 "Cards are for modular comparisons or evidence groups, not the default "
                 "way to make prose look designed."
@@ -583,6 +1247,8 @@ def _style_contract(
     reference_pptx: Path | None,
 ) -> dict[str, Any]:
     preset = PRESETS[style_preset]
+    style_reference = preset_style_reference(style_preset)
+    playbook = _story_dict(style_reference.get("layout_playbook"))
     contract: dict[str, Any] = {
         "workspace_version": 1,
         "deck_title": title,
@@ -603,6 +1269,17 @@ def _style_contract(
             "cards_use_measured_text_fit": True,
         },
         "preset_tokens": preset.to_dict(),
+        "style_reference": {
+            "catalog_version": style_reference.get("catalog_version"),
+            "reference_id": style_reference.get("reference_id"),
+            "reference_name": style_reference.get("reference_name"),
+            "source_status": style_reference.get("source_status"),
+            "style_dna": style_reference.get("style_dna"),
+            "style_metric_profile": style_reference.get("style_metric_profile"),
+            "layout_playbook_version": playbook.get("playbook_version"),
+            "preferred_variants": playbook.get("preferred_variants"),
+            "starter_outline_version": "style_reference_starter_outline_v1",
+        },
     }
     if reference_pptx:
         contract["reference"] = _reference_summary(reference_pptx)
@@ -743,6 +1420,8 @@ def main() -> int:
     _write_text(workspace / "assets" / "figures" / ".gitkeep", "")
     _write_text(workspace / "data" / ".gitkeep", "")
     _write_text(workspace / "build" / ".gitkeep", "")
+    if not source_outline and not reference_pptx:
+        _write_style_reference_assets(workspace, args.style_preset)
 
     slug = _slugify(args.title)
     if source_outline:

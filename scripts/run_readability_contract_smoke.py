@@ -110,6 +110,7 @@ def _write_fixture_sources(workspace: Path) -> None:
                 "slide_id": "table_probe",
                 "type": "content",
                 "variant": "table",
+                "table_treatment": "standard",
                 "title": "Tiny table cells trigger QA",
                 "headers": ["Sample", "Signal", "Ct"],
                 "rows": [

@@ -218,6 +218,7 @@ def _reproducibility_contract_summary(report: dict[str, Any]) -> dict[str, Any]:
             "header_variant_pool": _string_list(style_replay.get("header_variant_pool")),
             "footer_pool": _string_list(style_replay.get("footer_pool")),
             "chart_treatment_pool": _string_list(style_replay.get("chart_treatment_pool")),
+            "table_treatment_pool": _string_list(style_replay.get("table_treatment_pool")),
             "figure_table_treatment_pool": _string_list(
                 style_replay.get("figure_table_treatment_pool")
             ),
@@ -265,6 +266,7 @@ def _reproducibility_contract_lines(report: dict[str, Any]) -> list[str]:
             f"headers=`{_limited_markdown_list(style_replay.get('header_variant_pool'))}` "
             f"footers=`{_limited_markdown_list(style_replay.get('footer_pool'))}` "
             f"charts=`{_limited_markdown_list(style_replay.get('chart_treatment_pool'))}` "
+            f"tables=`{_limited_markdown_list(style_replay.get('table_treatment_pool'))}` "
             f"figures=`{_limited_markdown_list(style_replay.get('figure_table_treatment_pool'))}`"
         )
     if structure_replay:
@@ -735,11 +737,66 @@ def _resolved_treatment_markdown_lines(style: Any) -> list[str]:
         return []
     counts = summary.get("header_variant_counts")
     counts_text = json.dumps(counts, sort_keys=True) if isinstance(counts, dict) else "{}"
-    return [
+    lines = [
         "- Resolved header variants: "
         f"unique=`{int(summary.get('unique_header_variant_count') or 0)}` "
         f"counts=`{counts_text}`"
     ]
+    lines.extend(_style_reference_layout_markdown_lines(summary))
+    return lines
+
+
+def _style_reference_layout_markdown_lines(summary: Any) -> list[str]:
+    if not isinstance(summary, dict):
+        return []
+    layout = summary.get("style_reference_layout")
+    if not isinstance(layout, dict) or not layout:
+        return []
+    records = layout.get("variant_by_slide") if isinstance(layout.get("variant_by_slide"), list) else []
+    treatment_counts: dict[str, int] = {}
+    variant_counts: dict[str, int] = {}
+    recipe_signatures: set[str] = set()
+    recipe_versions: dict[str, int] = {}
+    slide_map: list[str] = []
+    for item in records:
+        if not isinstance(item, dict):
+            continue
+        treatment = str(item.get("treatment_key") or "").strip()
+        resolved_variant = str(item.get("resolved_variant") or "").strip()
+        recipe_signature = str(item.get("content_recipe_signature") or "").strip()
+        recipe_version = str(item.get("content_recipe_library_version") or "").strip()
+        if treatment:
+            treatment_counts[treatment] = treatment_counts.get(treatment, 0) + 1
+        if resolved_variant:
+            variant_counts[resolved_variant] = variant_counts.get(resolved_variant, 0) + 1
+        if recipe_signature:
+            recipe_signatures.add(recipe_signature)
+        if recipe_version:
+            recipe_versions[recipe_version] = recipe_versions.get(recipe_version, 0) + 1
+        if len(slide_map) < 8:
+            slide_id = str(item.get("slide_id") or "").strip() or f"s{len(slide_map) + 1}"
+            applied = "*" if item.get("applied") else ""
+            slide_map.append(f"{slide_id}:{treatment or 'unknown'}->{resolved_variant or 'unknown'}{applied}")
+    treatment_text = json.dumps(dict(sorted(treatment_counts.items())), sort_keys=True)
+    variant_text = json.dumps(dict(sorted(variant_counts.items())), sort_keys=True)
+    version_text = json.dumps(dict(sorted(recipe_versions.items())), sort_keys=True)
+    lines = [
+        "- Style-reference layouts: "
+        f"playbook=`{layout.get('playbook_version') or 'none'}` "
+        f"reference=`{layout.get('reference_id') or 'none'}` "
+        f"applied=`{_int_value(layout.get('applied_count'))}/{_int_value(layout.get('annotated_count'))}` "
+        f"skipped=`{_int_value(layout.get('skipped_count'))}` "
+        f"recipe_signatures=`{len(recipe_signatures)}`"
+    ]
+    if treatment_counts:
+        lines.append(f"- Style-reference treatments: `{treatment_text}`")
+    if variant_counts:
+        lines.append(f"- Style-reference variants: `{variant_text}`")
+    if recipe_versions:
+        lines.append(f"- Style-reference recipe versions: `{version_text}`")
+    if slide_map:
+        lines.append(f"- Style-reference slide map: `{', '.join(slide_map)}`")
+    return lines
 
 
 def _artifact_context_markdown_lines(manifest: Any, selection: Any) -> list[str]:
@@ -793,7 +850,8 @@ def _artifact_context_markdown_lines(manifest: Any, selection: Any) -> list[str]
             "- Bound artifact targets: "
             f"outputs=`{_markdown_list(selection.get('bound_output_ids'))}` "
             f"slides=`{_markdown_list(selection.get('slide_ids'))}` "
-            f"variants=`{_markdown_list(selection.get('variants'))}`"
+            f"variants=`{_markdown_list(selection.get('variants'))}` "
+            f"treatments=`{_markdown_list(selection.get('treatment_keys'))}`"
         )
     return lines
 
@@ -886,6 +944,8 @@ def _artifact_context_summary(report: dict[str, Any]) -> dict[str, Any]:
             "unbound_output_ids": _string_list(selection.get("unbound_output_ids")),
             "slide_ids": _string_list(selection.get("slide_ids")),
             "variants": _string_list(selection.get("variants")),
+            "treatment_keys": _string_list(selection.get("treatment_keys")),
+            "variant_sources": _string_list(selection.get("variant_sources")),
             "error": str(selection.get("error") or "").strip(),
         }
     tabular_data = _string_list(artifacts.get("tabular_data"))

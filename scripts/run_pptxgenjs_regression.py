@@ -16029,7 +16029,10 @@ def _run_style_mix_matrix_resolution_regression(repo: Path, outdir: Path, py: st
         "matrix_mode": ("matrix_mode_pool", ["open-quadrants", "cards"]),
         "stats_mode": ("stats_mode_pool", ["feature-left", "policy-bands", "tiles"]),
         "cards_mode": ("cards_mode_pool", ["feature-left", "staggered-row"]),
-        "chart_treatment": ("chart_treatment_pool", ["standard", "facts-below", "facts-right", "minimal"]),
+        "chart_treatment": (
+            "chart_treatment_pool",
+            ["standard", "facts-below", "facts-right", "minimal", "hero-stat", "threshold-band", "sparse-wide"],
+        ),
         "summary_callout_mode": ("summary_callout_mode_pool", ["lab-box", "default"]),
         "figure_table_treatment": ("figure_table_treatment_pool", ["figure-first", "table-first", "stats-strip", "image-sidebar"]),
         "footer_mode": ("footer_pool", ["source-line", "standard"]),

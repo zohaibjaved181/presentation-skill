@@ -228,8 +228,83 @@ def _notes_section(handoff: dict[str, Any], *, handoff_path: Path, handoff_sha: 
         lines.append(f"- Style seed: `{_text(alignment.get('style_seed'))}`")
     if _text(alignment.get("style_preset")):
         lines.append(f"- Style preset: `{_text(alignment.get('style_preset'))}`")
+    if _text(alignment.get("style_reference_id")):
+        lines.append(f"- Style reference: `{_text(alignment.get('style_reference_id'))}`")
     if _text(alignment.get("variant_mix_plan")):
         lines.append(f"- Variant mix: {_text(alignment.get('variant_mix_plan'))}")
+    motif_used = _as_dict(alignment.get("structural_motif_library_used"))
+    if motif_used:
+        version = _text(motif_used.get("motif_library_version")) or "style_reference_structural_motif_library_v1"
+        lines.append(f"- Structural motif library: `{version}`")
+        background = _text(motif_used.get("background_structure"))
+        if background:
+            lines.append(f"- Background structure: {background}")
+        motifs = [_text(item) for item in _as_list(motif_used.get("layout_motifs_used")) if _text(item)]
+        if motifs:
+            lines.append(f"- Layout motifs used: {', '.join(motifs[:6])}")
+    metric_used = _as_dict(alignment.get("style_metric_profile_used"))
+    if metric_used:
+        version = _text(metric_used.get("metric_profile_version")) or "style_reference_metric_profile_v1"
+        lines.append(f"- Style metric profile: `{version}`")
+        density = _text(metric_used.get("density_level"))
+        if density:
+            lines.append(f"- Density posture: {density}")
+        whitespace = _text(metric_used.get("whitespace_ratio_target"))
+        if whitespace:
+            lines.append(f"- Whitespace target: {whitespace}")
+        body_budget = _as_list(metric_used.get("body_words_per_content_slide"))
+        if body_budget:
+            lines.append(f"- Body word budget: {', '.join(_text(item) for item in body_budget if _text(item))}")
+        max_objects = _text(metric_used.get("max_primary_objects"))
+        if max_objects:
+            lines.append(f"- Max primary objects: {max_objects}")
+    playbook_used = _as_dict(alignment.get("layout_playbook_used"))
+    if playbook_used:
+        version = _text(playbook_used.get("playbook_version"))
+        lines.append(f"- Layout playbook: `{version or 'style_reference_layout_playbook_v1'}`")
+        preferred = [_text(item) for item in _as_list(playbook_used.get("preferred_variants")) if _text(item)]
+        if preferred:
+            lines.append(f"- Playbook variants used: {', '.join(preferred[:8])}")
+        archetypes = _as_dict(playbook_used.get("treatment_archetypes_used"))
+        title_archetype = _text(archetypes.get("title"))
+        refs_archetype = _text(archetypes.get("references"))
+        if title_archetype:
+            lines.append(f"- Title archetype used: {title_archetype}")
+        if refs_archetype:
+            lines.append(f"- References archetype used: {refs_archetype}")
+        body_archetypes = [
+            f"{key}={_text(value)}"
+            for key, value in archetypes.items()
+            if key not in {"title", "references"} and _text(value)
+        ]
+        if body_archetypes:
+            lines.append(f"- Body treatment archetypes used: {', '.join(body_archetypes[:8])}")
+        semantic_signatures = _as_dict(playbook_used.get("treatment_archetype_semantic_signatures_used"))
+        semantic_bits = [
+            f"{key}={_text(value)[:16]}"
+            for key, value in semantic_signatures.items()
+            if _text(value)
+        ]
+        if semantic_bits:
+            lines.append(f"- Treatment semantic signatures used: {', '.join(semantic_bits[:8])}")
+    recipe_used = _as_dict(alignment.get("content_recipe_library_used"))
+    if recipe_used:
+        version = _text(recipe_used.get("library_version")) or "style_reference_content_recipe_library_v1"
+        lines.append(f"- Content recipe library: `{version}`")
+        slide_recipe_map = [
+            item
+            for item in _as_list(recipe_used.get("slide_recipe_map"))
+            if isinstance(item, dict)
+        ]
+        if slide_recipe_map:
+            recipe_bits = []
+            for item in slide_recipe_map[:6]:
+                slide_id = _text(item.get("slide_id"))
+                treatment = _text(item.get("treatment_key"))
+                if slide_id and treatment:
+                    recipe_bits.append(f"{slide_id}:{treatment}")
+            if recipe_bits:
+                lines.append(f"- Content recipes used: {', '.join(recipe_bits)}")
     if _text(notes_append):
         lines.extend(["", "### Author Notes", _text(notes_append)])
     if rebuild_plan:
@@ -292,7 +367,8 @@ def _apply_handoff_metadata(
 ) -> tuple[bool, list[str]]:
     rebuild_plan = _artifact_rebuild_plan(handoff)
     quality_alignment = _quality_alignment(handoff)
-    if not rebuild_plan and not quality_alignment:
+    contract_alignment = _as_dict(handoff.get("contract_alignment"))
+    if not rebuild_plan and not quality_alignment and not contract_alignment:
         return False, []
 
     design_path = workspace / "design_brief.json"
@@ -313,6 +389,8 @@ def _apply_handoff_metadata(
         outline_meta["artifact_rebuild_plan"] = rebuild_plan
     if quality_alignment:
         outline_meta["quality_alignment"] = quality_alignment
+    if contract_alignment:
+        outline_meta["contract_alignment"] = contract_alignment
     design["outline_authoring_handoff"] = outline_meta
 
     if rebuild_plan:
@@ -355,6 +433,8 @@ def _apply_handoff_metadata(
         )
     if quality_alignment:
         touched.append("outline_authoring_handoff.quality_alignment")
+    if contract_alignment:
+        touched.append("outline_authoring_handoff.contract_alignment")
     return changed, touched
 
 

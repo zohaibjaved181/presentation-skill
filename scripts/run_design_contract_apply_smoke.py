@@ -26,6 +26,20 @@ ANSWER_FIXTURES = {
     ),
     "audience_context": "PI and translational assay team; dense leave-behind review.",
 }
+EXPECTED_RENDERER_TREATMENT_DEFAULTS = {
+    "title_layout": "lab-plate",
+    "footer_mode": "source-line",
+    "chart_treatment": "minimal",
+    "table_treatment": "compact-ledger",
+    "figure_table_treatment": "figure-first",
+    "stats_mode": "tiles",
+    "matrix_mode": "cards",
+    "summary_callout_mode": "lab-box",
+}
+EXPECTED_RENDERER_TREATMENT_SIGNATURE = "|".join(
+    f"{key}:{value}"
+    for key, value in EXPECTED_RENDERER_TREATMENT_DEFAULTS.items()
+)
 
 
 def _run(cmd: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -149,6 +163,7 @@ def _contract_fixture(
         ],
         "choice_resolution": {
             "seed_kind": "scout_refined",
+            "selected_renderer_treatment_signature": EXPECTED_RENDERER_TREATMENT_SIGNATURE,
         },
         "reproducibility_contract": {
             "contract_version": "deck_reproducibility_contract_v1",
@@ -160,6 +175,7 @@ def _contract_fixture(
                 "style_system.style_preset",
                 "style_system.background_system",
                 "style_system.style_mix_matrix",
+                "style_system.renderer_treatment_signature",
                 "slide_quality_contract",
                 "structure_blueprint.slide_sequence",
                 "readability_contract",
@@ -179,7 +195,10 @@ def _contract_fixture(
                 "header_variant_pool": ["split-rule", "top-bottom-rule", "plain"],
                 "footer_pool": ["source-line", "standard"],
                 "chart_treatment_pool": ["minimal", "facts-right"],
+                "table_treatment_pool": ["compact-ledger", "readout-sidecar"],
                 "figure_table_treatment_pool": ["figure-first", "image-sidebar"],
+                "renderer_treatment_signature": EXPECTED_RENDERER_TREATMENT_SIGNATURE,
+                "renderer_treatment_defaults": EXPECTED_RENDERER_TREATMENT_DEFAULTS,
                 "mix_rule": "Rotate only small lab chrome choices from the stable seed.",
                 "variation_boundaries": [
                     "Headers and footer treatment may rotate.",
@@ -286,6 +305,8 @@ def _contract_fixture(
             "font_pair": "system_clean_v1",
             "style_seed": seed,
             "background_system": "white report",
+            "renderer_treatment_signature": EXPECTED_RENDERER_TREATMENT_SIGNATURE,
+            "renderer_treatment_defaults": EXPECTED_RENDERER_TREATMENT_DEFAULTS,
             "header_system": {
                 "header_mode": "lab-clean",
                 "header_variant": "auto",
@@ -309,6 +330,7 @@ def _contract_fixture(
             },
             "figure_table_system": {
                 "figure_table_treatment": "figure-first",
+                "table_treatment": "compact-ledger",
             },
             "chart_system": {
                 "chart_treatment": "minimal",
@@ -317,6 +339,7 @@ def _contract_fixture(
                 "header_variant_pool": ["split-rule", "top-bottom-rule", "plain"],
                 "title_layout_pool": ["lab-plate", "light-atlas"],
                 "chart_treatment_pool": ["minimal", "facts-right"],
+                "table_treatment_pool": ["compact-ledger", "readout-sidecar"],
                 "summary_callout_mode_pool": ["lab-box", "default"],
                 "figure_table_treatment_pool": ["figure-first", "image-sidebar"],
                 "footer_pool": ["source-line", "standard"],
@@ -526,6 +549,16 @@ def _assert_contract_state(
         if isinstance(style_system.get("preset_treatment_profile"), dict)
         else {}
     )
+    style_reference = (
+        style_system.get("style_reference")
+        if isinstance(style_system.get("style_reference"), dict)
+        else {}
+    )
+    profile_reference = (
+        preset_profile.get("style_reference")
+        if isinstance(preset_profile.get("style_reference"), dict)
+        else {}
+    )
     if style_system.get("style_seed") != expected_seed:
         failures.append({"step": "design_brief", "reason": "style_seed_not_applied", "value": style_system.get("style_seed")})
     if style_system.get("style_preset") != "lab-report":
@@ -533,12 +566,89 @@ def _assert_contract_state(
     if (
         preset_profile.get("profile_version") != "deck_preset_treatment_profiles_v1"
         or preset_profile.get("style_preset") != "lab-report"
+        or profile_reference.get("catalog_version") != "style_reference_catalog_v1"
+        or not preset_profile.get("renderer_treatment_signature")
+        or not isinstance(preset_profile.get("renderer_treatment_defaults"), dict)
     ):
         failures.append(
             {
                 "step": "design_brief",
                 "reason": "preset_treatment_profile_not_applied",
                 "preset_treatment_profile": preset_profile,
+            }
+        )
+    if style_system.get("renderer_treatment_signature") != EXPECTED_RENDERER_TREATMENT_SIGNATURE:
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "style_system_renderer_signature_not_applied",
+                "style_system": style_system,
+            }
+        )
+    if style_system.get("renderer_treatment_defaults") != EXPECTED_RENDERER_TREATMENT_DEFAULTS:
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "style_system_renderer_defaults_not_applied",
+                "style_system": style_system,
+            }
+        )
+    if (
+        style_reference.get("catalog_version") != "style_reference_catalog_v1"
+        or style_reference.get("source_status") != "synthetic_original_publish_safe"
+        or not isinstance(style_reference.get("content_treatments"), dict)
+        or not isinstance(style_reference.get("layout_playbook"), dict)
+        or not isinstance(style_reference.get("structural_motif_library"), dict)
+        or not isinstance(style_reference.get("style_metric_profile"), dict)
+        or not style_reference["content_treatments"].get("chart")
+        or not style_reference["content_treatments"].get("table")
+        or not style_reference["content_treatments"].get("references")
+        or style_reference["layout_playbook"].get("playbook_version") != "style_reference_layout_playbook_v1"
+        or style_reference["structural_motif_library"].get("motif_library_version") != "style_reference_structural_motif_library_v1"
+        or style_reference["style_metric_profile"].get("metric_profile_version") != "style_reference_metric_profile_v1"
+        or not style_reference["style_metric_profile"].get("metric_signature")
+        or "semantic result table" not in style_reference["structural_motif_library"].get("layout_motifs", [])
+        or "lab-run-results" not in style_reference["layout_playbook"].get("preferred_variants", [])
+    ):
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "style_reference_not_applied",
+                "style_reference": style_reference,
+            }
+        )
+    treatment_archetypes = (
+        style_reference.get("layout_playbook", {}).get("treatment_archetypes")
+        if isinstance(style_reference.get("layout_playbook"), dict)
+        else {}
+    )
+    expected_body_archetypes = {
+        "comparison": "clean-assay-report-comparison-frame",
+        "chart": "clean-assay-report-chart-readout",
+        "table": "clean-assay-report-table-ledger",
+        "figure": "clean-assay-report-figure-proof-object",
+        "dashboard": "clean-assay-report-dashboard-state-board",
+        "decision": "clean-assay-report-decision-record",
+    }
+    expected_all_archetype_keys = {
+        "title",
+        "references",
+        *expected_body_archetypes.keys(),
+    }
+    if (
+        not isinstance(treatment_archetypes, dict)
+        or treatment_archetypes.get("title", {}).get("archetype_id") != "lab-run-metadata-plate-opener"
+        or treatment_archetypes.get("references", {}).get("archetype_id") != "lab-source-id-refs-table"
+        or any(
+            treatment_archetypes.get(key, {}).get("archetype_id") != value
+            for key, value in expected_body_archetypes.items()
+        )
+    ):
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "style_reference_treatment_archetypes_missing",
+                "treatment_archetypes": treatment_archetypes,
             }
         )
 
@@ -552,6 +662,14 @@ def _assert_contract_state(
         failures.append({"step": "design_brief", "reason": "design_contract_seed_mismatch"})
     if choice_resolution.get("stable_prompt_id") != expected_seed:
         failures.append({"step": "design_brief", "reason": "choice_resolution_not_enriched"})
+    if choice_resolution.get("selected_renderer_treatment_signature") != EXPECTED_RENDERER_TREATMENT_SIGNATURE:
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "choice_resolution_renderer_signature_not_applied",
+                "choice_resolution": choice_resolution,
+            }
+        )
     if sorted(choice_resolution.get("route_ledger_active_routes", [])) != _active_route_ids(packet.get("route_decision_ledger", {})):
         failures.append(
             {
@@ -575,14 +693,114 @@ def _assert_contract_state(
         failures.append({"step": "design_brief", "reason": "replay_header_pool_not_persisted", "style_replay": replay_style})
     if replay_style.get("chart_treatment_pool") != ["minimal", "facts-right"]:
         failures.append({"step": "design_brief", "reason": "replay_chart_pool_not_persisted", "style_replay": replay_style})
+    if replay_style.get("table_treatment_pool") != ["compact-ledger", "readout-sidecar"]:
+        failures.append({"step": "design_brief", "reason": "replay_table_pool_not_persisted", "style_replay": replay_style})
+    if replay.get("renderer_treatment_signature") != EXPECTED_RENDERER_TREATMENT_SIGNATURE:
+        failures.append({"step": "design_brief", "reason": "replay_renderer_signature_missing", "replay": replay})
+    if replay_style.get("renderer_treatment_signature") != EXPECTED_RENDERER_TREATMENT_SIGNATURE:
+        failures.append({"step": "design_brief", "reason": "replay_style_renderer_signature_missing", "style_replay": replay_style})
+    if replay_style.get("renderer_treatment_defaults") != EXPECTED_RENDERER_TREATMENT_DEFAULTS:
+        failures.append({"step": "design_brief", "reason": "replay_style_renderer_defaults_missing", "style_replay": replay_style})
+    if (
+        replay_style.get("structural_motif_library_version") != "style_reference_structural_motif_library_v1"
+        or not replay_style.get("structural_motif_signature")
+        or "semantic result table" not in replay_style.get("layout_motifs", [])
+    ):
+        failures.append({"step": "design_brief", "reason": "replay_style_structural_motif_missing", "style_replay": replay_style})
+    if (
+        replay_style.get("style_metric_profile_version") != "style_reference_metric_profile_v1"
+        or not replay_style.get("style_metric_signature")
+        or not replay_style.get("body_words_per_content_slide")
+        or not isinstance(replay_style.get("evidence_object_mix"), dict)
+    ):
+        failures.append({"step": "design_brief", "reason": "replay_style_metric_profile_missing", "style_replay": replay_style})
+    if (
+        replay_style.get("title_archetype_id") != "lab-run-metadata-plate-opener"
+        or replay_style.get("references_archetype_id") != "lab-source-id-refs-table"
+    ):
+        failures.append({"step": "design_brief", "reason": "replay_style_treatment_archetypes_missing", "style_replay": replay_style})
+    replay_body_archetypes = (
+        replay_style.get("treatment_archetype_ids")
+        if isinstance(replay_style.get("treatment_archetype_ids"), dict)
+        else {}
+    )
+    if any(replay_body_archetypes.get(key) != value for key, value in expected_body_archetypes.items()):
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "replay_style_body_treatment_archetypes_missing",
+                "style_replay": replay_style,
+            }
+        )
+    replay_style_semantic = (
+        replay_style.get("treatment_archetype_semantic_signatures")
+        if isinstance(replay_style.get("treatment_archetype_semantic_signatures"), dict)
+        else {}
+    )
+    if set(replay_style_semantic) != expected_all_archetype_keys or any(
+        len(str(value or "")) < 20 for value in replay_style_semantic.values()
+    ):
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "replay_style_semantic_treatment_signatures_missing",
+                "style_replay": replay_style,
+            }
+        )
     if replay_structure.get("slide_variant_mix") != ["title", "split"]:
         failures.append({"step": "design_brief", "reason": "replay_structure_not_persisted", "structure_replay": replay_structure})
+    if (
+        replay_structure.get("content_recipe_library_version") != "style_reference_content_recipe_library_v1"
+        or not isinstance(replay_structure.get("content_recipe_signatures"), dict)
+    ):
+        failures.append({"step": "design_brief", "reason": "replay_content_recipe_library_missing", "structure_replay": replay_structure})
+    if (
+        replay_structure.get("structural_motif_library_version") != "style_reference_structural_motif_library_v1"
+        or not replay_structure.get("structural_motif_signature")
+        or len(replay_structure.get("structural_content_object_rules") if isinstance(replay_structure.get("structural_content_object_rules"), list) else []) < 3
+    ):
+        failures.append({"step": "design_brief", "reason": "replay_structure_structural_motif_missing", "structure_replay": replay_structure})
+    replay_archetypes = (
+        replay_structure.get("style_reference_treatment_archetypes")
+        if isinstance(replay_structure.get("style_reference_treatment_archetypes"), dict)
+        else {}
+    )
+    if (
+        replay_archetypes.get("title", {}).get("archetype_id") != "lab-run-metadata-plate-opener"
+        or replay_archetypes.get("references", {}).get("archetype_id") != "lab-source-id-refs-table"
+        or any(
+            replay_archetypes.get(key, {}).get("archetype_id") != value
+            for key, value in expected_body_archetypes.items()
+        )
+    ):
+        failures.append({"step": "design_brief", "reason": "replay_structure_treatment_archetypes_missing", "structure_replay": replay_structure})
+    replay_structure_semantic = (
+        replay_structure.get("treatment_archetype_semantic_signatures")
+        if isinstance(replay_structure.get("treatment_archetype_semantic_signatures"), dict)
+        else {}
+    )
+    if set(replay_structure_semantic) != expected_all_archetype_keys or any(
+        len(str(value or "")) < 20 for value in replay_structure_semantic.values()
+    ):
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "replay_structure_semantic_treatment_signatures_missing",
+                "structure_replay": replay_structure,
+            }
+        )
     if replay_artifact.get("analysis_summary") != "assets/analysis_summary.json":
         failures.append({"step": "design_brief", "reason": "replay_artifact_summary_missing", "artifact_replay": replay_artifact})
 
     renderer = design.get("renderer_treatments") if isinstance(design.get("renderer_treatments"), dict) else {}
     if renderer.get("header_mode") != "lab-clean" or renderer.get("footer_mode") != "source-line":
         failures.append({"step": "design_brief", "reason": "renderer_treatments_not_mapped", "renderer": renderer})
+    if renderer.get("table_treatment") != "compact-ledger":
+        failures.append({"step": "design_brief", "reason": "renderer_table_treatment_not_mapped", "renderer": renderer})
+    if renderer.get("renderer_treatment_signature") != EXPECTED_RENDERER_TREATMENT_SIGNATURE:
+        failures.append({"step": "design_brief", "reason": "renderer_signature_not_mapped", "renderer": renderer})
+    if renderer.get("renderer_treatment_defaults") != EXPECTED_RENDERER_TREATMENT_DEFAULTS:
+        failures.append({"step": "design_brief", "reason": "renderer_defaults_not_mapped", "renderer": renderer})
     if not isinstance(design.get("analysis_artifact_plan"), dict):
         failures.append({"step": "design_brief", "reason": "analysis_artifact_plan_missing"})
     if not isinstance(design.get("readability_contract"), dict) or not isinstance(design.get("speed_contract"), dict):
@@ -1041,6 +1259,42 @@ def main() -> int:
             failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_slide_quality_contract"})
         if "preset treatment profile for design contract" not in prompt_text or "deck_preset_treatment_profiles_v1" not in prompt_text:
             failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_preset_treatment_profile"})
+        if "Prompt-to-style reference matches" not in prompt_text or "style_reference_catalog_v1" not in prompt_text:
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_style_reference_matches"})
+        if "style_reference_layout_playbook_v1" not in prompt_text or "layout_playbook" not in prompt_text:
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_style_reference_layout_playbook"})
+        if (
+            "style_reference_mix_plan_v1" not in prompt_text
+            or '"secondary_influences"' not in prompt_text
+            or '"treatment_mix"' not in prompt_text
+        ):
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_style_reference_mix_plan"})
+        if "style_reference_content_recipe_library_v1" not in prompt_text or "content_recipe_library" not in prompt_text:
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_content_recipe_library"})
+        if "style_reference_structural_motif_library_v1" not in prompt_text or "structural_motif_library" not in prompt_text:
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_structural_motif_library"})
+        if (
+            "style_reference_metric_profile_v1" not in prompt_text
+            or "style_metric_profile" not in prompt_text
+            or "body_words_per_content_slide" not in prompt_text
+            or "evidence_object_mix" not in prompt_text
+        ):
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_style_metric_profile"})
+        if (
+            "treatment_archetypes" not in prompt_text
+            or "lab-run-metadata-plate-opener" not in prompt_text
+            or "clean-assay-report-table-ledger" not in prompt_text
+            or "clean-assay-report-figure-proof-object" not in prompt_text
+        ):
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_treatment_archetypes"})
+        if "semantic_signature" not in prompt_text or "treatment_archetype_semantic_signatures" not in prompt_text:
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_semantic_treatment_signatures"})
+        if "generic_slide_patterns" not in prompt_text or "style_source_intake" not in prompt_text:
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_source_pattern_intake"})
+        if "renderer_treatment_signature" not in prompt_text or "selected_renderer_treatment_signature" not in prompt_text:
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_renderer_treatment_signature"})
+        if "renderer_treatment_defaults" not in prompt_text or "renderer_treatment_fields" not in prompt_text:
+            failures.append({"step": "emit_design_contract_prompt", "reason": "prompt_missing_renderer_treatment_defaults"})
 
         packet_quality = (
             packet.get("slide_quality_contract")
@@ -1174,6 +1428,23 @@ def main() -> int:
             "prompt_contains_choice_seed": "design_brief.choice_resolution_seed summary" in prompt_text and seed in prompt_text,
             "prompt_contains_reproducibility_contract": '"reproducibility_contract"' in prompt_text and "deck_reproducibility_contract_v1" in prompt_text,
             "prompt_contains_slide_quality_contract": '"slide_quality_contract"' in prompt_text and "slide_quality_contract_v1" in prompt_text,
+            "prompt_contains_content_recipe_library": "style_reference_content_recipe_library_v1" in prompt_text
+            and "content_recipe_library" in prompt_text,
+            "prompt_contains_structural_motif_library": "style_reference_structural_motif_library_v1" in prompt_text
+            and "structural_motif_library" in prompt_text,
+            "prompt_contains_style_metric_profile": "style_reference_metric_profile_v1" in prompt_text
+            and "style_metric_profile" in prompt_text
+            and "body_words_per_content_slide" in prompt_text,
+            "prompt_contains_treatment_archetypes": "treatment_archetypes" in prompt_text
+            and "lab-run-metadata-plate-opener" in prompt_text
+            and "clean-assay-report-table-ledger" in prompt_text
+            and "clean-assay-report-figure-proof-object" in prompt_text,
+            "prompt_contains_source_pattern_intake": "generic_slide_patterns" in prompt_text
+            and "style_source_intake" in prompt_text,
+            "prompt_contains_renderer_treatment_signature": "renderer_treatment_signature" in prompt_text
+            and "selected_renderer_treatment_signature" in prompt_text,
+            "prompt_contains_renderer_treatment_defaults": "renderer_treatment_defaults" in prompt_text
+            and "renderer_treatment_fields" in prompt_text,
             "apply_changed_file_count": len(apply_report.get("changed_files", [])) if isinstance(apply_report, dict) else None,
             "repeat_changed_file_count": len(repeat_report.get("changed_files", [])) if isinstance(repeat_report, dict) else None,
             "choice_resolution_enriched_from_seed": apply_report.get("choice_resolution_enriched_from_seed") if isinstance(apply_report, dict) else None,
@@ -1215,6 +1486,10 @@ def main() -> int:
                         "prompt_contains_choice_seed",
                         "prompt_contains_reproducibility_contract",
                         "prompt_contains_slide_quality_contract",
+                        "prompt_contains_content_recipe_library",
+                        "prompt_contains_treatment_archetypes",
+                        "prompt_contains_renderer_treatment_signature",
+                        "prompt_contains_renderer_treatment_defaults",
                         "apply_changed_file_count",
                         "repeat_changed_file_count",
                         "choice_resolution_enriched_from_seed",

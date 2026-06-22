@@ -25,6 +25,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from style_inspiration_corpus import compact_style_inspiration_context
+from style_reference_catalog import rank_style_references, style_reference_mix_plan
+from style_treatment_profiles import preset_treatment_profile
+
 
 def _read_optional(path: Path) -> str | None:
     if not path.exists():
@@ -55,6 +59,381 @@ def _compact_json(payload: Any, limit: int) -> str:
     if payload is None:
         return "<missing or malformed>"
     return _truncate(json.dumps(payload, indent=2, ensure_ascii=False), limit)
+
+
+def _reference_field(match: dict[str, Any], key: str) -> Any:
+    reference = match.get("reference") if isinstance(match.get("reference"), dict) else {}
+    return reference.get(key)
+
+
+def _compact_recipe_library(reference: dict[str, Any]) -> dict[str, Any]:
+    library = (
+        reference.get("content_recipe_library")
+        if isinstance(reference.get("content_recipe_library"), dict)
+        else {}
+    )
+    recipes = library.get("recipes") if isinstance(library.get("recipes"), dict) else {}
+    compact_recipes: dict[str, Any] = {}
+    for treatment_key, recipe in recipes.items():
+        if not isinstance(recipe, dict):
+            continue
+        archetype = (
+            recipe.get("treatment_archetype")
+            if isinstance(recipe.get("treatment_archetype"), dict)
+            else {}
+        )
+        compact_recipes[str(treatment_key)] = {
+            "primary_variants": recipe.get("primary_variants"),
+            "required_slots": recipe.get("required_slots"),
+            "data_roles": recipe.get("data_roles"),
+            "source_posture": recipe.get("source_posture"),
+            "recipe_signature": recipe.get("recipe_signature"),
+            "treatment_archetype": {
+                "archetype_id": archetype.get("archetype_id"),
+                "structure": archetype.get("structure"),
+                "object_pattern": archetype.get("object_pattern"),
+                "required_fields": archetype.get("required_fields")
+                if isinstance(archetype.get("required_fields"), list)
+                else [],
+                "primary_variants": archetype.get("primary_variants")
+                if isinstance(archetype.get("primary_variants"), list)
+                else [],
+            }
+            if archetype
+            else {},
+        }
+    return {
+        "library_version": library.get("library_version"),
+        "recipe_signatures": library.get("recipe_signatures")
+        if isinstance(library.get("recipe_signatures"), dict)
+        else {},
+        "recipes": compact_recipes,
+        "authoring_contract": (
+            library.get("authoring_contract")
+            if isinstance(library.get("authoring_contract"), list)
+            else []
+        )[:4],
+    }
+
+
+def _compact_source_intake(reference: dict[str, Any]) -> dict[str, Any]:
+    intake = (
+        reference.get("style_source_intake")
+        if isinstance(reference.get("style_source_intake"), dict)
+        else {}
+    )
+    sources: list[dict[str, Any]] = []
+    for source in intake.get("sources", []):
+        if not isinstance(source, dict):
+            continue
+        sources.append(
+            {
+                "source_id": source.get("source_id"),
+                "source_name": source.get("source_name"),
+                "source_url": source.get("source_url"),
+                "source_status": source.get("source_status"),
+                "license_summary": source.get("license_summary"),
+                "allowed_extractions": (
+                    source.get("allowed_extractions")
+                    if isinstance(source.get("allowed_extractions"), list)
+                    else []
+                )[:4],
+                "generic_style_observations": (
+                    source.get("generic_style_observations")
+                    if isinstance(source.get("generic_style_observations"), list)
+                    else []
+                )[:3],
+                "generic_slide_patterns": (
+                    source.get("generic_slide_patterns")
+                    if isinstance(source.get("generic_slide_patterns"), list)
+                    else []
+                )[:3],
+                "design_constraints": (
+                    source.get("design_constraints")
+                    if isinstance(source.get("design_constraints"), list)
+                    else []
+                )[:3],
+                "forbidden_materials": (
+                    source.get("forbidden_materials")
+                    if isinstance(source.get("forbidden_materials"), list)
+                    else []
+                )[:5],
+            }
+        )
+    return {
+        "manifest_version": intake.get("manifest_version"),
+        "source_checked_date": intake.get("source_checked_date"),
+        "route_id": intake.get("route_id"),
+        "derivation_mode": intake.get("derivation_mode"),
+        "source_ids": intake.get("source_ids") if isinstance(intake.get("source_ids"), list) else [],
+        "use_cases": intake.get("use_cases") if isinstance(intake.get("use_cases"), list) else [],
+        "required_synthetic_content": (
+            intake.get("required_synthetic_content")
+            if isinstance(intake.get("required_synthetic_content"), list)
+            else []
+        ),
+        "content_treatment_scope": (
+            intake.get("content_treatment_scope")
+            if isinstance(intake.get("content_treatment_scope"), list)
+            else []
+        ),
+        "sources": sources,
+        "publish_safety": intake.get("publish_safety") if isinstance(intake.get("publish_safety"), dict) else {},
+    }
+
+
+def _compact_style_metric_profile(reference: dict[str, Any]) -> dict[str, Any]:
+    profile = (
+        reference.get("style_metric_profile")
+        if isinstance(reference.get("style_metric_profile"), dict)
+        else {}
+    )
+    return {
+        "metric_profile_version": profile.get("metric_profile_version"),
+        "density_level": profile.get("density_level"),
+        "whitespace_ratio_target": profile.get("whitespace_ratio_target"),
+        "body_words_per_content_slide": (
+            profile.get("body_words_per_content_slide")
+            if isinstance(profile.get("body_words_per_content_slide"), list)
+            else []
+        ),
+        "max_primary_objects": profile.get("max_primary_objects"),
+        "visual_hierarchy": profile.get("visual_hierarchy"),
+        "evidence_object_mix": (
+            profile.get("evidence_object_mix")
+            if isinstance(profile.get("evidence_object_mix"), dict)
+            else {}
+        ),
+        "source_burden": profile.get("source_burden"),
+        "footer_posture": profile.get("footer_posture"),
+        "artifact_bias": profile.get("artifact_bias") if isinstance(profile.get("artifact_bias"), list) else [],
+        "readability_bias": (
+            profile.get("readability_bias")
+            if isinstance(profile.get("readability_bias"), list)
+            else []
+        ),
+        "metric_signature": profile.get("metric_signature"),
+    }
+
+
+def _compact_footer_reference_contract(
+    reference: dict[str, Any], renderer_profile: dict[str, Any]
+) -> dict[str, Any]:
+    defaults = (
+        renderer_profile.get("renderer_treatment_defaults")
+        if isinstance(renderer_profile.get("renderer_treatment_defaults"), dict)
+        else {}
+    )
+    mix = (
+        renderer_profile.get("style_mix_matrix")
+        if isinstance(renderer_profile.get("style_mix_matrix"), dict)
+        else {}
+    )
+    playbook = (
+        reference.get("layout_playbook")
+        if isinstance(reference.get("layout_playbook"), dict)
+        else {}
+    )
+    library = (
+        reference.get("content_recipe_library")
+        if isinstance(reference.get("content_recipe_library"), dict)
+        else {}
+    )
+    recipes = library.get("recipes") if isinstance(library.get("recipes"), dict) else {}
+    references_recipe = (
+        recipes.get("references") if isinstance(recipes.get("references"), dict) else {}
+    )
+    archetype = (
+        references_recipe.get("treatment_archetype")
+        if isinstance(references_recipe.get("treatment_archetype"), dict)
+        else {}
+    )
+    footer_pool = mix.get("footer_pool") if isinstance(mix.get("footer_pool"), list) else []
+    default_footer = str(defaults.get("footer_mode") or "").strip() or "standard"
+    return {
+        "contract_version": "style_reference_footer_reference_contract_v1",
+        "default_footer_mode": default_footer,
+        "footer_pool": footer_pool,
+        "source_footer_policy": playbook.get("source_footer_policy"),
+        "references_recipe_signature": references_recipe.get("recipe_signature"),
+        "references_source_posture": references_recipe.get("source_posture"),
+        "references_required_slots": (
+            references_recipe.get("required_slots")
+            if isinstance(references_recipe.get("required_slots"), list)
+            else []
+        )[:4],
+        "references_data_roles": (
+            references_recipe.get("data_roles")
+            if isinstance(references_recipe.get("data_roles"), list)
+            else []
+        )[:4],
+        "references_treatment_archetype": {
+            "archetype_id": archetype.get("archetype_id"),
+            "footer_mode": archetype.get("footer_mode"),
+            "structure": archetype.get("structure"),
+            "required_fields": (
+                archetype.get("required_fields")
+                if isinstance(archetype.get("required_fields"), list)
+                else []
+            ),
+        }
+        if archetype
+        else {},
+        "page_number_policy": (
+            "Use a bottom-right page number for report/source-line decks; "
+            "omit only when the primary reference explicitly supports a no-footer title or poster page."
+        ),
+        "source_line_policy": (
+            "Use short source IDs near the footer rule; move long citations to a final "
+            "editable references table or small source notes below the rule when space permits."
+        ),
+        "readability_policy": (
+            "Reserve footer space, keep source IDs readable, and never let footer provenance "
+            "collide with dense tables, charts, or figure captions."
+        ),
+    }
+
+
+def _renderer_profile_for_preset(preset: Any) -> dict[str, Any]:
+    key = str(preset or "").strip()
+    if not key:
+        return {}
+    try:
+        profile = preset_treatment_profile(key)
+    except Exception:
+        return {}
+    mix = profile.get("style_mix_matrix") if isinstance(profile.get("style_mix_matrix"), dict) else {}
+    return {
+        "renderer_treatment_defaults": profile.get("renderer_treatment_defaults"),
+        "renderer_treatment_signature": profile.get("renderer_treatment_signature"),
+        "style_mix_matrix": {
+            "header_variant_pool": mix.get("header_variant_pool"),
+            "title_layout_pool": mix.get("title_layout_pool"),
+            "chart_treatment_pool": mix.get("chart_treatment_pool"),
+            "table_treatment_pool": mix.get("table_treatment_pool"),
+            "figure_table_treatment_pool": mix.get("figure_table_treatment_pool"),
+            "stats_mode_pool": mix.get("stats_mode_pool"),
+            "matrix_mode_pool": mix.get("matrix_mode_pool"),
+            "summary_callout_mode_pool": mix.get("summary_callout_mode_pool"),
+            "footer_pool": mix.get("footer_pool"),
+            "mix_rule": mix.get("mix_rule"),
+            "do_not_mix": mix.get("do_not_mix"),
+        },
+    }
+
+
+def _style_reference_match_context(text: str, *, limit: int = 22000) -> str:
+    query = str(text or "").strip()
+    if not query:
+        return "<no prompt or workspace text available for style-reference matching>"
+    matches = rank_style_references(query, limit=5)
+    mix_plan = style_reference_mix_plan(query, limit=3)
+    primary = mix_plan.get("primary") if isinstance(mix_plan.get("primary"), dict) else {}
+    secondaries = (
+        mix_plan.get("secondary_influences")
+        if isinstance(mix_plan.get("secondary_influences"), list)
+        else []
+    )
+    compact_matches: list[dict[str, Any]] = []
+    full_reference_by_id: dict[str, dict[str, Any]] = {}
+    for match in matches:
+        if not isinstance(match, dict):
+            continue
+        reference = match.get("reference") if isinstance(match.get("reference"), dict) else {}
+        renderer_profile = _renderer_profile_for_preset(match.get("style_preset"))
+        reference_id = str(_reference_field(match, "reference_id") or "").strip()
+        if reference_id:
+            full_reference_by_id[reference_id] = reference
+        compact_matches.append(
+            {
+                "style_preset": match.get("style_preset"),
+                "score": match.get("score"),
+                "reference_id": _reference_field(match, "reference_id"),
+                "reference_name": _reference_field(match, "reference_name"),
+                "style_dna": _reference_field(match, "style_dna"),
+                "structural_motif_library": _reference_field(match, "structural_motif_library"),
+                "style_metric_profile": _compact_style_metric_profile(reference),
+                "renderer_treatment_defaults": renderer_profile.get("renderer_treatment_defaults"),
+                "renderer_treatment_signature": renderer_profile.get("renderer_treatment_signature"),
+                "style_source_intake": _compact_source_intake(reference),
+                "signature_moves": _reference_field(match, "signature_moves"),
+                "content_treatments": _reference_field(match, "content_treatments"),
+                "layout_playbook": _reference_field(match, "layout_playbook"),
+                "content_recipe_library": _compact_recipe_library(reference),
+                "footer_reference_contract": _compact_footer_reference_contract(
+                    reference, renderer_profile
+                ),
+                "example_storyboard": _reference_field(match, "example_storyboard"),
+                "publish_safety": _reference_field(match, "publish_safety"),
+                "style_mix_matrix": renderer_profile.get("style_mix_matrix"),
+            }
+        )
+    primary_reference_id = str(primary.get("reference_id") or "").strip()
+    primary_reference = full_reference_by_id.get(primary_reference_id, {})
+    primary_renderer_profile = _renderer_profile_for_preset(primary.get("style_preset"))
+    inspiration_context = compact_style_inspiration_context(
+        query,
+        primary_preset=str(primary.get("style_preset") or ""),
+    )
+    compact_mix = {
+        "mix_plan_version": mix_plan.get("mix_plan_version"),
+        "query_summary": _truncate(str(mix_plan.get("query") or ""), 700),
+        "primary": {
+            "style_preset": primary.get("style_preset"),
+            "score": primary.get("score"),
+            "reference_id": primary.get("reference_id"),
+            "reference_name": primary.get("reference_name"),
+            "style_dna": primary.get("style_dna"),
+            "structural_motif_library": primary.get("structural_motif_library"),
+            "style_metric_profile": _compact_style_metric_profile(primary_reference),
+            **primary_renderer_profile,
+            "footer_reference_contract": _compact_footer_reference_contract(
+                primary_reference, primary_renderer_profile
+            ),
+        },
+        "secondary_influences": [
+            {
+                "style_preset": item.get("style_preset"),
+                "score": item.get("score"),
+                "reference_id": item.get("reference_id"),
+                "reference_name": item.get("reference_name"),
+                "style_dna": item.get("style_dna"),
+                "structural_motif_library": item.get("structural_motif_library"),
+                "style_metric_profile": _compact_style_metric_profile(
+                    full_reference_by_id.get(str(item.get("reference_id") or ""), {})
+                ),
+                **_renderer_profile_for_preset(item.get("style_preset")),
+            }
+            for item in secondaries
+            if isinstance(item, dict)
+        ],
+        "treatment_mix": mix_plan.get("treatment_mix"),
+        "mixing_rules": mix_plan.get("mixing_rules"),
+    }
+    return _compact_json(
+        {
+            "purpose": (
+                "Use this publish-safe synthetic style-reference context to pick "
+                "design DNA, layout playbook, content recipes, and renderer treatment pools. "
+                "Do not copy external/proprietary slide geometry. Use the descriptor-only "
+                "style inspiration corpus for broad source matching, then open the selected "
+                "preset contact-sheet collection use cases before borrowing any treatment ideas."
+            ),
+            "style_inspiration_corpus": inspiration_context,
+            "preset_contact_collection_contract": {
+                "collection_version": "style_reference_preset_contact_collection_v1",
+                "required_use_cases": ["overview", "data_evidence", "decision_sources"],
+                "browse_rule": (
+                    "Open the primary preset's overview sheet first, then data_evidence "
+                    "or decision_sources based on the evidence burden. Compare secondary "
+                    "preset collections only for named treatment borrow decisions."
+                ),
+            },
+            "matches": compact_matches,
+            "mix_plan": compact_mix,
+        },
+        limit,
+    )
 
 
 def _text_blob(value: Any) -> str:
@@ -178,6 +557,34 @@ Read these refs first. They are authoritative:
 - {reference_script_patterns}
 - {dynamic_design_and_subagents}
 
+Use the prompt-to-style reference matches below as the primary design-memory
+context. The `mix_plan.primary` reference owns the base preset, layout
+playbook, source/footer posture, renderer treatment defaults, and supported
+variant families. Secondary references may influence specific treatment keys,
+but record borrowed influence explicitly. Do not let the output collapse to
+broad generic categories when a publish-safe synthetic reference provides
+concrete `layout_playbook`, `content_recipe_library`, and
+`style_metric_profile`, and `renderer_treatment_signature` guidance. Use the
+metric profile to set density, whitespace, body-word budget, maximum primary
+object count, evidence-object mix, source burden, and artifact/readability
+bias before recommending slide variants.
+
+The `style_inspiration_corpus` block is a descriptor-only source index for
+dynamic design scouting. It may suggest public design systems, slide tooling,
+template indexes, and article heuristics as broad inspiration, but it never
+permits copying raw decks, screenshots, logos, proprietary text, or distinctive
+slide geometry. Use its selected routes and safety rules to decide which
+per-preset contact-sheet collection to browse (`overview`, `data_evidence`,
+or `decision_sources`) and where a treatment-specific secondary influence is
+worth recording.
+
+Treat report structure and source/footer posture as first-class reproducibility
+contracts. Bind the selected reference's layout playbook to a concrete section
+order, treatment recipes, footer mode, source-line/page-number rule, and final
+references behavior. The `footer_reference_contract` in the prompt-to-style
+matches is authoritative for page number posture, source IDs, small source
+notes, and when long references move to an editable references table.
+
 Important rule: do NOT route by keywords alone. Terms like ASCO, TB, LAMP,
 clinical, LOD, sequencing, assay, sample, and resistance are useful priors, but
 you must validate them against the objective, audience, evidence objects, and
@@ -237,6 +644,82 @@ Return ONLY valid JSON with this shape:
 {{
   "design_dna": "lab results dashboard | board risk memo | product/investor reveal | editorial report | civic science policy | custom",
   "style_preset": "loadable preset name",
+  "style_reference_selection": {{
+    "mix_plan_version": "style_reference_mix_plan_v1",
+    "primary_reference_id": "selected reference id from prompt-to-style matches",
+    "primary_reference_name": "selected reference name",
+    "primary_style_dna": "copied or summarized style_dna",
+    "secondary_reference_ids": ["only when a secondary match materially affects a treatment"],
+    "layout_playbook_version": "style_reference_layout_playbook_v1",
+    "treatment_variant_map_used": {{
+      "title": ["title"],
+      "chart": ["chart"],
+      "table": ["table", "lab-run-results"],
+      "figure": ["scientific-figure", "image-sidebar"],
+      "dashboard": ["stats", "lab-run-results"],
+      "comparison": ["comparison-2col", "matrix", "split"],
+      "decision": ["table", "standard"],
+      "references": ["table"]
+    }},
+    "content_recipe_library_version": "style_reference_content_recipe_library_v1",
+    "style_metric_profile_version": "style_reference_metric_profile_v1",
+    "style_metric_signature": "copy selected reference style_metric_profile.metric_signature",
+    "density_level": "copy selected reference density posture",
+    "whitespace_ratio_target": "copy selected reference whitespace target",
+    "body_words_per_content_slide": "copy selected reference body word budget",
+    "max_primary_objects": "copy selected reference object-count limit",
+    "visual_hierarchy": "copy selected reference evidence scan path",
+    "evidence_object_mix": "copy selected reference chart/table/figure/prose weights",
+    "renderer_treatment_signature": "copy selected reference/profile signature or supported override",
+    "style_inspiration_corpus_used": {{
+      "corpus_version": "style_inspiration_corpus_v1",
+      "storage_rule": "descriptor_only_no_raw_decks",
+      "primary_source_ids": ["descriptor source ids used for broad inspiration"],
+      "borrowed_descriptor_tags": ["descriptor tags that affected the route"],
+      "preset_contact_collection_use_cases": ["overview", "data_evidence", "decision_sources"],
+      "safety_statement": "descriptor-only use; synthetic reconstruction through local renderer"
+    }},
+    "treatment_mix_used": {{
+      "title": "primary or secondary reference id",
+      "chart": "primary or secondary reference id",
+      "table": "primary or secondary reference id",
+      "figure": "primary or secondary reference id",
+      "dashboard": "primary or secondary reference id",
+      "comparison": "primary or secondary reference id",
+      "decision": "primary or secondary reference id",
+      "references": "primary or secondary reference id"
+    }},
+    "routing_rationale": [
+      "specific prompt/evidence signal that matched the selected reference"
+    ]
+  }},
+  "report_structure_contract": {{
+    "structure_version": "style_reference_report_structure_contract_v1",
+    "primary_layout_playbook_id": "selected reference id",
+    "opening_sequence": ["cover/title route", "first evidence or context route"],
+    "section_order": ["context", "evidence", "analysis", "decision", "references"],
+    "content_recipe_bindings": [
+      {{
+        "treatment_key": "chart | table | figure | comparison | dashboard | decision | references",
+        "recipe_signature": "copy from selected content_recipe_library",
+        "required_slots": ["slot that must be present"],
+        "target_variants": ["supported variant names"],
+        "source_or_artifact_binding": "chart:<name> | table:<name> | image:<name> | source:<id>"
+      }}
+    ],
+    "rebuild_determinism": [
+      "store selected reference id, style_seed, treatment map, artifact aliases, and source IDs in outline/design brief"
+    ]
+  }},
+  "source_footer_contract": {{
+    "contract_version": "style_reference_footer_reference_contract_v1",
+    "footer_mode": "standard | source-line",
+    "footer_pool": ["source-line", "standard"],
+    "page_number_policy": "bottom-right page number for report/source-line decks unless a no-footer page is intentional",
+    "source_line_policy": "short source IDs near or below the footer rule; long refs move to final editable references table",
+    "small_source_note_policy": "small but readable source notes only; do not crowd evidence or collide with charts/tables",
+    "references_slide_policy": "editable references table or sparse source slide when proof burden requires full citations"
+  }},
   "deck_style": {{
     "style_seed": "short stable deck-specific seed",
     "header_mode": "bar | stack | eyebrow | lab-clean | lab-card",
@@ -244,7 +727,8 @@ Return ONLY valid JSON with this shape:
     "footer_mode": "standard | source-line",
     "summary_callout_mode": "default | lab-box",
     "figure_table_treatment": "figure-first | table-first | stats-strip | image-sidebar",
-    "chart_treatment": "standard | facts-below | facts-right | minimal",
+    "chart_treatment": "standard | facts-below | facts-right | minimal | hero-stat | threshold-band | sparse-wide",
+    "table_treatment": "standard | compact-ledger | readout-sidecar | decision-matrix | journal-grid",
     "research_visual_mode": true
   }},
   "style_mix_matrix": {{
@@ -255,7 +739,8 @@ Return ONLY valid JSON with this shape:
     "matrix_mode_pool": ["cards", "open-quadrants"],
     "stats_mode_pool": ["tiles", "feature-left", "policy-bands"],
     "cards_mode_pool": ["feature-left", "staggered-row"],
-    "chart_treatment_pool": ["standard", "facts-below", "facts-right", "minimal"],
+    "chart_treatment_pool": ["standard", "facts-below", "facts-right", "minimal", "hero-stat", "threshold-band", "sparse-wide"],
+    "table_treatment_pool": ["standard", "compact-ledger", "readout-sidecar", "decision-matrix", "journal-grid"],
     "summary_callout_mode_pool": ["default", "lab-box"],
     "figure_table_treatment_pool": ["figure-first", "table-first", "stats-strip", "image-sidebar"],
     "footer_pool": ["source-line", "standard", "none"],
@@ -413,6 +898,10 @@ Return ONLY valid JSON with this shape:
 
 {keyword_priors}
 
+--- Prompt-to-style reference matches ---
+
+{style_reference_matches}
+
 --- Workspace summary ---
 
 {workspace_summary}
@@ -514,6 +1003,7 @@ def main() -> int:
     prompt = PROMPT.format(
         user_prompt=args.user_prompt or "<not provided>",
         keyword_priors="\n".join(f"- {item}" for item in priors) or "<none>",
+        style_reference_matches=_style_reference_match_context(combined_text),
         workspace_summary="\n".join(_outline_summary(outline)),
         evidence_summary="\n".join(_evidence_summary(evidence_plan, asset_plan)),
         design_brief=_compact_json(design_brief, args.truncate_json),

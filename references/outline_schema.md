@@ -66,7 +66,8 @@ If `deck_style`/`compliance` are omitted, current behavior remains:
 - `deck_style.matrix_mode`: preset treatment (`cards` or `open-quadrants`)
 - `deck_style.stats_mode`: preset treatment (`tiles`, `feature-left`, or `policy-bands`)
 - `deck_style.chart_treatment`: chart layout treatment (`standard`,
-  `facts-below`, `facts-right`, or `minimal`)
+  `facts-below`, `facts-right`, `minimal`, `hero-stat`, `threshold-band`, or
+  `sparse-wide`)
 - `deck_style.footer_mode`: preset treatment (`standard` or `source-line`)
 - `deck_style.summary_callout_mode`: preset treatment (`default` or `lab-box`)
 - `deck_style.figure_table_treatment`: evidence-layout treatment
@@ -102,10 +103,18 @@ If `deck_style`/`compliance` are omitted, current behavior remains:
   the header-bottom rule. `plain` omits the header rule entirely.
 - `header_variants`: optional array limiting the `auto` pool to a smaller set
   of the supported `header_variant` values.
+- `treatment_key`: optional content-grammar hint for style-reference decks.
+  Supported values are `title`, `comparison`, `chart`, `table`, `figure`,
+  `dashboard`, `decision`, and `references`. Use it when a generic source
+  slide should resolve through the selected preset's
+  `style_reference_layout_playbook_v1` and content-recipe library.
 - `resolved_treatments`: generated only in `build/outline_resolved.json`, not
   an authoring field. For lab/report slides it records the concrete
   `header_variant` selected from `auto` plus the pool/source used, so seeded
-  heading chrome can be audited before render.
+  heading chrome can be audited before render. For style-reference resolution,
+  `resolved_treatments.style_reference_layout` records the treatment key,
+  source/resolved variant, reference ID, content-recipe library version, and
+  content-recipe signature that shaped the resolved slide.
 - `header_rule_color`: optional color token or hex override for the lab/report
   accent rule, for example `accent_secondary`.
 - `title_layout`: optional cover archetype override. Supported values:
@@ -129,9 +138,18 @@ If `deck_style`/`compliance` are omitted, current behavior remains:
   civic/report scorecards.
 - `chart_treatment`: optional chart composition override. Use `standard` or
   `facts-below` when a chart should own the slide with compact readout cards
-  below it, `facts-right` when the chart needs a side evidence rail, and
-  `minimal` when the figure needs maximum plot area and the caption/source line
-  carries interpretation.
+  below it, `facts-right` when the chart needs a side evidence rail,
+  `hero-stat` when one headline metric should lead a pitch/investor chart,
+  `threshold-band` when a lab/risk/clinical chart needs an explicit status
+  readout band, `sparse-wide` for quiet editorial/research charts with more
+  whitespace, and `minimal` when the figure needs maximum plot area and the
+  caption/source line carries interpretation.
+- `table_treatment`: optional editable-table composition override. Use
+  `standard` for a simple full-width table, `compact-ledger` for dense
+  report/board evidence, `readout-sidecar` when a short interpretation panel
+  should sit beside the table, `decision-matrix` when the table should end in
+  a decision strip, and `journal-grid` for restrained academic/editorial
+  tables.
 - `footer_mode`: optional footer override. Use `source-line` for a thin rule
   above sources and page number, especially in academic/lab decks.
 - `footer_source_label` / `footer_refs_label`: optional labels for compact
@@ -147,6 +165,9 @@ If `deck_style`/`compliance` are omitted, current behavior remains:
   report slides. Use `figure-first` when plots/images carry the proof,
   `table-first` when structured results dominate, `stats-strip` for compact
   numeric readouts, and `image-sidebar` for one large figure plus interpretation.
+  Scientific-figure slides can also set `figure_layout` directly when the
+  preset bias needs a specific page grammar: `panel-grid`, `primary-rail`,
+  `ledger-rail`, or `strip-readout`.
 - `footer_page_numbers`: boolean. Use `true` for source-line/report decks.
 
 Only override renderer treatments when the design brief requires it. The
@@ -393,9 +414,13 @@ Use `variant` to force layout family:
   `assets.figures` with 1-4 entries such as
   `{ "path": "assets/panel_a.png", "label": "A", "title": "...", "caption": "..." }`.
   The renderer creates journal-style panel boxes, subfigure labels, optional
-  panel titles/captions, and a bottom caption/interpretation strip. Use this
-  for LOD panels, multi-plot summaries, gels, microscopy grids, and figure
-  evidence slides where a sidebar would waste space.
+  panel titles/captions, and a bottom caption/interpretation strip. Set
+  `figure_layout` to `panel-grid` for the classic academic grid,
+  `primary-rail` for one dominant figure plus interpretation rail,
+  `ledger-rail` for table-first/traceable panel ledgers, or `strip-readout`
+  for pitch/ops-style figure proof with a metric/status band. Use this for
+  LOD panels, multi-plot summaries, gels, microscopy grids, and figure evidence
+  slides where a sidebar would waste space.
   Preflight errors if more than 4 panels are supplied, because the renderer
   only lays out the first 4 panels.
   Keep the bottom `caption`/`figure_caption` plus `interpretation`/`takeaway`
@@ -488,8 +513,11 @@ Variant-specific fields:
   - array of 1-4 figure objects. Each figure needs `path` or `image`; optional
     `label`, `title`, and `caption` render inside the figure panel.
   - slide-level `caption`, `figure_caption`, `interpretation`, or `takeaway`
-    renders beneath the panel grid. Keep this compact and move long methods
-    text into notes or an appendix.
+    renders beneath the panel grid or inside the selected `figure_layout`
+    readout/rail. Keep this compact and move long methods text into notes or
+    an appendix.
+  - `figure_layout`: optional `panel-grid`, `primary-rail`, `ledger-rail`, or
+    `strip-readout`; omit it to use the preset/default panel grid.
   - the image file should already be slide-ready: tight crop, compact legend,
     and enough plotted/image content to remain readable at panel size.
 - `facts` / `stats` / `evidence` (for `stats` or `chart`):

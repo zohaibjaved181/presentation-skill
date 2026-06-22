@@ -41,7 +41,8 @@ SUPPORTED_TIMELINE_MODES = {"rail-cards", "staggered", "open-events", "bands", "
 SUPPORTED_MATRIX_MODES = {"cards", "open-quadrants"}
 SUPPORTED_STATS_MODES = {"tiles", "feature-left", "policy-bands"}
 SUPPORTED_CARDS_MODES = {"feature-left", "staggered-row"}
-SUPPORTED_CHART_TREATMENTS = {"standard", "facts-below", "facts-right", "minimal"}
+SUPPORTED_CHART_TREATMENTS = {"standard", "facts-below", "facts-right", "minimal", "hero-stat", "threshold-band", "sparse-wide"}
+SUPPORTED_TABLE_TREATMENTS = {"standard", "compact-ledger", "readout-sidecar", "decision-matrix", "journal-grid"}
 SUPPORTED_FOOTERS = {"standard", "source-line", "none"}
 SUPPORTED_SUMMARY_CALLOUT_MODES = {"default", "lab-box"}
 SUPPORTED_FIGURE_TREATMENTS = {
@@ -59,6 +60,7 @@ STYLE_MIX_POOL_SPECS = (
     ("stats_mode_pool", SUPPORTED_STATS_MODES, False),
     ("cards_mode_pool", SUPPORTED_CARDS_MODES, False),
     ("chart_treatment_pool", SUPPORTED_CHART_TREATMENTS, False),
+    ("table_treatment_pool", SUPPORTED_TABLE_TREATMENTS, False),
     ("summary_callout_mode_pool", SUPPORTED_SUMMARY_CALLOUT_MODES, False),
     ("summary_callout_pool", SUPPORTED_SUMMARY_CALLOUT_MODES | {"kpi-hero", "promote-card", "thin-rule-callout", "none"}, False),
     ("footer_pool", SUPPORTED_FOOTERS, False),
@@ -2544,6 +2546,7 @@ STYLE_TREATMENT_ENUMS = {
     "stats_mode": SUPPORTED_STATS_MODES,
     "cards_mode": SUPPORTED_CARDS_MODES,
     "chart_treatment": SUPPORTED_CHART_TREATMENTS,
+    "table_treatment": SUPPORTED_TABLE_TREATMENTS,
     "footer_mode": SUPPORTED_FOOTERS,
     "summary_callout_mode": SUPPORTED_SUMMARY_CALLOUT_MODES,
     "figure_table_treatment": SUPPORTED_FIGURE_TREATMENTS,
@@ -2667,7 +2670,7 @@ def _validate_style_treatments(brief: dict[str, Any]) -> list[dict[str, str]]:
             issues,
             payload=style_system.get("figure_table_system"),
             base="design_brief.style_system.figure_table_system",
-            keys={"figure_table_treatment"},
+            keys={"figure_table_treatment", "table_treatment"},
         )
         _validate_treatment_payload(
             issues,

@@ -276,6 +276,94 @@ def _source_inventory_lines(report: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _compact_style_reference_layout_summary(layout: Any) -> dict[str, Any]:
+    if not isinstance(layout, dict) or not layout:
+        return {}
+    raw_records = layout.get("variant_by_slide") if isinstance(layout.get("variant_by_slide"), list) else []
+    records: list[dict[str, Any]] = []
+    treatment_counts: dict[str, int] = {}
+    variant_counts: dict[str, int] = {}
+    recipe_versions: dict[str, int] = {}
+    recipe_signatures: set[str] = set()
+    for item in raw_records:
+        if not isinstance(item, dict):
+            continue
+        record = {
+            "slide_id": str(item.get("slide_id") or "").strip(),
+            "slide_index": _int_value(item.get("slide_index")),
+            "title": str(item.get("title") or "").strip(),
+            "treatment_key": str(item.get("treatment_key") or "").strip(),
+            "source_variant": str(item.get("source_variant") or "").strip(),
+            "resolved_variant": str(item.get("resolved_variant") or "").strip(),
+            "applied": bool(item.get("applied")),
+            "content_recipe_library_version": str(
+                item.get("content_recipe_library_version") or ""
+            ).strip(),
+            "content_recipe_signature": str(item.get("content_recipe_signature") or "").strip(),
+        }
+        records.append(record)
+        treatment = record["treatment_key"]
+        variant = record["resolved_variant"]
+        recipe_version = record["content_recipe_library_version"]
+        recipe_signature = record["content_recipe_signature"]
+        if treatment:
+            treatment_counts[treatment] = treatment_counts.get(treatment, 0) + 1
+        if variant:
+            variant_counts[variant] = variant_counts.get(variant, 0) + 1
+        if recipe_version:
+            recipe_versions[recipe_version] = recipe_versions.get(recipe_version, 0) + 1
+        if recipe_signature:
+            recipe_signatures.add(recipe_signature)
+
+    existing_treatments = layout.get("treatment_key_counts")
+    if isinstance(existing_treatments, dict) and not treatment_counts:
+        treatment_counts = {
+            str(key): _int_value(value)
+            for key, value in sorted(existing_treatments.items())
+            if str(key).strip()
+        }
+    existing_variants = layout.get("resolved_variant_counts")
+    if isinstance(existing_variants, dict) and not variant_counts:
+        variant_counts = {
+            str(key): _int_value(value)
+            for key, value in sorted(existing_variants.items())
+            if str(key).strip()
+        }
+    existing_versions = layout.get("content_recipe_library_version_counts")
+    if isinstance(existing_versions, dict) and not recipe_versions:
+        recipe_versions = {
+            str(key): _int_value(value)
+            for key, value in sorted(existing_versions.items())
+            if str(key).strip()
+        }
+    existing_signatures = layout.get("content_recipe_signatures")
+    if isinstance(existing_signatures, list):
+        recipe_signatures.update(str(item).strip() for item in existing_signatures if str(item).strip())
+
+    skipped = (
+        [item for item in layout.get("skipped_slides", []) if isinstance(item, dict)]
+        if isinstance(layout.get("skipped_slides"), list)
+        else []
+    )
+    return {
+        "playbook_version": str(layout.get("playbook_version") or "").strip(),
+        "style_preset": str(layout.get("style_preset") or "").strip(),
+        "reference_id": str(layout.get("reference_id") or "").strip(),
+        "reference_name": str(layout.get("reference_name") or "").strip(),
+        "applied_count": _int_value(layout.get("applied_count")),
+        "annotated_count": _int_value(layout.get("annotated_count")),
+        "skipped_count": _int_value(layout.get("skipped_count")),
+        "treatment_key_counts": dict(sorted(treatment_counts.items())),
+        "resolved_variant_counts": dict(sorted(variant_counts.items())),
+        "content_recipe_library_version_counts": dict(sorted(recipe_versions.items())),
+        "content_recipe_signature_count": len(recipe_signatures)
+        or _int_value(layout.get("content_recipe_signature_count")),
+        "content_recipe_signatures": sorted(recipe_signatures),
+        "variant_by_slide": records,
+        "skipped_slides": skipped[:12],
+    }
+
+
 def _resolved_treatment_summary(report: dict[str, Any]) -> dict[str, Any]:
     summary = (
         report.get("resolved_treatment_summary")
@@ -291,7 +379,7 @@ def _resolved_treatment_summary(report: dict[str, Any]) -> dict[str, Any]:
         )
     if not summary:
         return {}
-    return {
+    compact = {
         "header_variant_by_slide": (
             summary.get("header_variant_by_slide", [])
             if isinstance(summary.get("header_variant_by_slide"), list)
@@ -304,6 +392,12 @@ def _resolved_treatment_summary(report: dict[str, Any]) -> dict[str, Any]:
         ),
         "unique_header_variant_count": _int_value(summary.get("unique_header_variant_count")),
     }
+    style_reference_layout = _compact_style_reference_layout_summary(
+        summary.get("style_reference_layout")
+    )
+    if style_reference_layout:
+        compact["style_reference_layout"] = style_reference_layout
+    return compact
 
 
 def _resolved_treatment_lines(report: dict[str, Any]) -> list[str]:
@@ -312,11 +406,67 @@ def _resolved_treatment_lines(report: dict[str, Any]) -> list[str]:
         return ["- Resolved header variants: `none`"]
     counts = summary.get("header_variant_counts")
     counts_text = json.dumps(counts, sort_keys=True) if isinstance(counts, dict) else "{}"
-    return [
+    lines = [
         "- Resolved header variants: "
         f"unique=`{int(summary.get('unique_header_variant_count') or 0)}` "
         f"counts=`{counts_text}`"
     ]
+    lines.extend(_style_reference_layout_lines(summary))
+    return lines
+
+
+def _style_reference_layout_lines(summary: Any) -> list[str]:
+    if not isinstance(summary, dict):
+        return []
+    layout = summary.get("style_reference_layout")
+    if not isinstance(layout, dict) or not layout:
+        return []
+    treatment_counts = (
+        layout.get("treatment_key_counts")
+        if isinstance(layout.get("treatment_key_counts"), dict)
+        else {}
+    )
+    variant_counts = (
+        layout.get("resolved_variant_counts")
+        if isinstance(layout.get("resolved_variant_counts"), dict)
+        else {}
+    )
+    recipe_versions = (
+        layout.get("content_recipe_library_version_counts")
+        if isinstance(layout.get("content_recipe_library_version_counts"), dict)
+        else {}
+    )
+    records = layout.get("variant_by_slide") if isinstance(layout.get("variant_by_slide"), list) else []
+    slide_map: list[str] = []
+    for item in records:
+        if not isinstance(item, dict) or len(slide_map) >= 8:
+            continue
+        slide_id = str(item.get("slide_id") or "").strip() or f"s{len(slide_map) + 1}"
+        treatment = str(item.get("treatment_key") or "").strip() or "unknown"
+        resolved_variant = str(item.get("resolved_variant") or "").strip() or "unknown"
+        applied = "*" if item.get("applied") else ""
+        slide_map.append(f"{slide_id}:{treatment}->{resolved_variant}{applied}")
+    lines = [
+        "- Style-reference layouts: "
+        f"playbook=`{layout.get('playbook_version') or 'none'}` "
+        f"reference=`{layout.get('reference_id') or 'none'}` "
+        f"applied=`{_int_value(layout.get('applied_count'))}/{_int_value(layout.get('annotated_count'))}` "
+        f"skipped=`{_int_value(layout.get('skipped_count'))}` "
+        f"recipe_signatures=`{_int_value(layout.get('content_recipe_signature_count'))}`"
+    ]
+    if treatment_counts:
+        lines.append(
+            f"- Style-reference treatments: `{json.dumps(treatment_counts, sort_keys=True)}`"
+        )
+    if variant_counts:
+        lines.append(f"- Style-reference variants: `{json.dumps(variant_counts, sort_keys=True)}`")
+    if recipe_versions:
+        lines.append(
+            f"- Style-reference recipe versions: `{json.dumps(recipe_versions, sort_keys=True)}`"
+        )
+    if slide_map:
+        lines.append(f"- Style-reference slide map: `{', '.join(slide_map)}`")
+    return lines
 
 
 def _string_list(value: Any) -> list[str]:
@@ -363,6 +513,7 @@ def _reproducibility_contract_summary(report: dict[str, Any]) -> dict[str, Any]:
             "header_variant_pool": _string_list(style_replay.get("header_variant_pool")),
             "footer_pool": _string_list(style_replay.get("footer_pool")),
             "chart_treatment_pool": _string_list(style_replay.get("chart_treatment_pool")),
+            "table_treatment_pool": _string_list(style_replay.get("table_treatment_pool")),
             "figure_table_treatment_pool": _string_list(
                 style_replay.get("figure_table_treatment_pool")
             ),
@@ -409,6 +560,7 @@ def _reproducibility_contract_lines(report: dict[str, Any]) -> list[str]:
             f"background=`{style_replay.get('background_system') or 'none'}` "
             f"headers=`{_limited_markdown_list(style_replay.get('header_variant_pool'))}` "
             f"charts=`{_limited_markdown_list(style_replay.get('chart_treatment_pool'))}` "
+            f"tables=`{_limited_markdown_list(style_replay.get('table_treatment_pool'))}` "
             f"figures=`{_limited_markdown_list(style_replay.get('figure_table_treatment_pool'))}`"
         )
     if structure_replay:
@@ -970,6 +1122,7 @@ def _artifact_context_lines(report: dict[str, Any]) -> list[str]:
             f"outputs=`{_markdown_list(selection.get('bound_output_ids'))}` "
             f"slides=`{_markdown_list(selection.get('slide_ids'))}` "
             f"variants=`{_markdown_list(selection.get('variants'))}` "
+            f"treatments=`{_markdown_list(selection.get('treatment_keys'))}` "
             f"unbound=`{_markdown_list(selection.get('unbound_output_ids'))}`"
         )
     tabular_data = context.get("tabular_data")

@@ -72,3 +72,18 @@ plus `timeline_mode: chapter-spread` when a launch milestone deserves visual
 priority, editorial decks to `masthead` plus `timeline_mode: open-events` or
 `bands`, and civic decks to `light-atlas` plus `matrix_mode: open-quadrants` /
 `stats_mode: policy-bands`.
+
+For richer preset differentiation, read `references/style_reference_catalog.md`
+and `scripts/style_reference_catalog.py`. The catalog gives each preset a
+publish-safe synthetic style family with content-treatment rules for title,
+comparison, chart, table, figure, dashboard, decision, and references slides.
+It also exposes `style_reference_mix_plan_v1` and
+`style_reference_layout_playbook_v1`: use the mix plan to choose one primary
+reference plus bounded secondary influences, then use the layout playbook to
+map treatments to supported outline variants and preset-specific opening
+sequences. Use those references as design memory, then render only through
+supported outline variants and treatment pools. When visual examples are
+needed, run `scripts/build_style_reference_gallery.py` to generate actual
+synthetic reference decks and optional contact sheets without bundling external
+template assets; its summary records variant sequences, chart/table treatment
+sequences, treatment buckets, and QA evidence for comparing preset breadth.

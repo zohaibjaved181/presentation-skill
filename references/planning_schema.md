@@ -53,6 +53,18 @@ Recommended shape:
   },
   "design_dna": "lab results dashboard | board risk memo | product/investor reveal | editorial report | civic science policy | custom",
   "renderer_treatments": {
+    "renderer_treatment_signature": "title_layout:...|footer_mode:...|chart_treatment:...|table_treatment:...|figure_table_treatment:...|stats_mode:...|matrix_mode:...|summary_callout_mode:...",
+    "renderer_treatment_fields": ["title_layout", "footer_mode", "chart_treatment", "table_treatment", "figure_table_treatment", "stats_mode", "matrix_mode", "summary_callout_mode"],
+    "renderer_treatment_defaults": {
+      "title_layout": "split-hero | lab-plate | command-center | poster | masthead | light-atlas",
+      "footer_mode": "standard | source-line",
+      "chart_treatment": "standard | facts-below | facts-right | minimal | hero-stat | threshold-band | sparse-wide",
+      "table_treatment": "standard | compact-ledger | readout-sidecar | decision-matrix | journal-grid",
+      "figure_table_treatment": "figure-first | table-first | stats-strip | image-sidebar",
+      "stats_mode": "tiles | feature-left | policy-bands",
+      "matrix_mode": "cards | open-quadrants",
+      "summary_callout_mode": "default | lab-box"
+    },
     "header_mode": "bar | stack | eyebrow | lab-clean | lab-card",
     "header_variant": "auto | left-accent | split-rule | title-rule | side-rail | top-bottom-rule | plain",
     "title_layout": "split-hero | lab-plate | command-center | poster | masthead | light-atlas",
@@ -61,7 +73,8 @@ Recommended shape:
     "timeline_mode": "rail-cards | staggered | open-events | bands | chapter-spread",
     "matrix_mode": "cards | open-quadrants",
     "stats_mode": "tiles | feature-left | policy-bands",
-    "chart_treatment": "standard | facts-below | facts-right | minimal",
+    "chart_treatment": "standard | facts-below | facts-right | minimal | hero-stat | threshold-band | sparse-wide",
+    "table_treatment": "standard | compact-ledger | readout-sidecar | decision-matrix | journal-grid",
     "footer_mode": "standard | source-line",
     "footer_source_label": "Sources",
     "footer_refs_label": "Refs",
@@ -76,7 +89,8 @@ Recommended shape:
     "matrix_mode_pool": ["cards", "open-quadrants"],
     "stats_mode_pool": ["tiles", "feature-left", "policy-bands"],
     "cards_mode_pool": ["feature-left", "staggered-row"],
-    "chart_treatment_pool": ["standard", "facts-below", "facts-right", "minimal"],
+    "chart_treatment_pool": ["standard", "facts-below", "facts-right", "minimal", "hero-stat", "threshold-band", "sparse-wide"],
+    "table_treatment_pool": ["standard", "compact-ledger", "readout-sidecar", "decision-matrix", "journal-grid"],
     "summary_callout_mode_pool": ["default", "lab-box"],
     "figure_table_treatment_pool": ["figure-first", "table-first", "stats-strip", "image-sidebar"],
     "footer_pool": ["source-line", "standard", "none"],
@@ -111,13 +125,39 @@ Recommended shape:
       "header_variant_pool": ["split-rule", "top-bottom-rule", "plain"],
       "footer_pool": ["source-line", "standard"],
       "chart_treatment_pool": ["minimal", "facts-right"],
+      "table_treatment_pool": ["compact-ledger", "readout-sidecar"],
       "figure_table_treatment_pool": ["figure-first", "image-sidebar"],
+      "renderer_treatment_signature": "title_layout:lab-plate|footer_mode:source-line|chart_treatment:minimal|table_treatment:compact-ledger|figure_table_treatment:figure-first|stats_mode:tiles|matrix_mode:cards|summary_callout_mode:lab-box",
+      "renderer_treatment_defaults": {
+        "title_layout": "lab-plate",
+        "footer_mode": "source-line",
+        "chart_treatment": "minimal",
+        "table_treatment": "compact-ledger",
+        "figure_table_treatment": "figure-first",
+        "stats_mode": "tiles",
+        "matrix_mode": "cards",
+        "summary_callout_mode": "lab-box"
+      },
+      "style_metric_profile_version": "style_reference_metric_profile_v1",
+      "style_metric_signature": "metric signature from selected style reference",
+      "density_level": "high clean lab report",
+      "whitespace_ratio_target": 0.19,
+      "body_words_per_content_slide": [36, 62],
+      "max_primary_objects": 4,
+      "visual_hierarchy": "run metadata, result table, figure panel, and refs stay traceable",
+      "evidence_object_mix": {"chart": 0.22, "table": 0.34, "figure": 0.36, "prose": 0.08},
       "mix_rule": "Rotate small treatments from style_seed while locking evidence layouts",
       "variation_boundaries": ["What may rotate", "What stays fixed in this deck"]
     },
     "structure_replay": {
       "target_slide_count": 8,
       "slide_variant_mix": ["title", "image-sidebar", "lab-run-results"],
+      "content_recipe_library_version": "style_reference_content_recipe_library_v1",
+      "content_recipe_signatures": {
+        "chart": "recipe signature from selected style reference",
+        "table": "recipe signature from selected style reference",
+        "figure": "recipe signature from selected style reference"
+      },
       "evidence_anchor_rule": "Every evidence/data slide gets a visible chart, table, figure, or image anchor",
       "white_space_rule": "Choose variants that match actual evidence shape"
     },
@@ -599,7 +639,16 @@ scientific/report decks reproducible:
   is unchanged. For lab/report decks, the resolved outline also includes
   generated per-slide `resolved_treatments.header_variant` values and a compact
   `resolved_treatment_summary`; use these as audit evidence for seeded
-  mix-and-match header rhythm, not as source fields to hand-edit.
+  mix-and-match header rhythm, not as source fields to hand-edit. When slides
+  carry `treatment_key`, `build/outline_resolved.json` also records
+  `resolved_treatments.style_reference_layout.content_recipe_signature`, so
+  the resolved layout can be audited against the selected
+  `style_reference_content_recipe_library_v1`. Style references also carry
+  `style_reference_metric_profile_v1`; design contracts should persist the
+  selected metric signature, density level, whitespace target, body-word
+  budget, maximum primary object count, visual hierarchy, evidence-object mix,
+  source burden, and footer posture in `reproducibility_contract.style_replay`
+  so outline authors can split or rebalance slides before QA catches crowding.
   A short `style_seed` in `style_system`, `renderer_treatments`, or `deck_style`
   locks deterministic treatment-pool resolution so repeated builds match while
   similar report decks can still have different title/footer/section/header

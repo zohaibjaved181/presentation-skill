@@ -17,11 +17,16 @@ from typing import Any, Optional, Set
 DATA_REL = "data/run_readout.csv"
 OUTPUT_ID = "run_readout_signal"
 EXPECTED_BINDINGS = [
-    (OUTPUT_ID, "image-sidebar", f"{OUTPUT_ID}_figure"),
+    (OUTPUT_ID, "scientific-figure", f"{OUTPUT_ID}_figure"),
     (OUTPUT_ID, "chart", f"{OUTPUT_ID}_chart"),
     (OUTPUT_ID, "lab-run-results", f"{OUTPUT_ID}_table"),
 ]
 EXPECTED_SIDEBAR_BODY_FONT_SIZE = 16
+EXPECTED_TREATMENT_KEYS = {
+    f"{OUTPUT_ID}_figure": "figure",
+    f"{OUTPUT_ID}_chart": "chart",
+    f"{OUTPUT_ID}_table": "table",
+}
 EXPECTED_REQUIRED_ARTIFACTS = {
     f"{OUTPUT_ID}_figure": [f"{OUTPUT_ID}_figure"],
     f"{OUTPUT_ID}_chart": [f"{OUTPUT_ID}_chart_json"],
@@ -222,12 +227,43 @@ def _assert_triplet_bindings(
                 "actual": actual_bindings,
             }
         )
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            continue
+        slide_id = str(binding.get("slide_id") or "")
+        expected_treatment = EXPECTED_TREATMENT_KEYS.get(slide_id)
+        if expected_treatment and binding.get("treatment_key") != expected_treatment:
+            failures.append(
+                {
+                    "step": "artifact_selection",
+                    "reason": "selection_missing_treatment_key",
+                    "slide_id": slide_id,
+                    "expected": expected_treatment,
+                    "actual": binding.get("treatment_key"),
+                    "binding": binding,
+                }
+            )
+        style_hint = binding.get("style_reference_layout_hint")
+        if expected_treatment and (
+            not isinstance(style_hint, dict)
+            or style_hint.get("treatment_key") != expected_treatment
+            or style_hint.get("style_preset") != "lab-report"
+        ):
+            failures.append(
+                {
+                    "step": "artifact_selection",
+                    "reason": "selection_missing_style_reference_hint",
+                    "slide_id": slide_id,
+                    "expected_treatment_key": expected_treatment,
+                    "style_reference_layout_hint": style_hint,
+                }
+            )
     figure_binding = next(
         (
             binding
             for binding in bindings
             if isinstance(binding, dict)
-            and str(binding.get("variant") or "") == "image-sidebar"
+            and str(binding.get("variant") or "") == "scientific-figure"
         ),
         {},
     )
@@ -301,6 +337,87 @@ def _assert_triplet_bindings(
                 "slide": figure_slide,
             }
         )
+    for slide_id, treatment_key in EXPECTED_TREATMENT_KEYS.items():
+        slide = slides_by_id.get(slide_id, {})
+        if slide.get("treatment_key") != treatment_key:
+            failures.append(
+                {
+                    "step": "outline",
+                    "reason": "artifact_slide_missing_treatment_key",
+                    "slide_id": slide_id,
+                    "expected": treatment_key,
+                    "actual": slide.get("treatment_key"),
+                    "slide": slide,
+                }
+            )
+        style_hint = slide.get("style_reference_layout_hint")
+        if not isinstance(style_hint, dict) or style_hint.get("treatment_key") != treatment_key:
+            failures.append(
+                {
+                    "step": "outline",
+                    "reason": "artifact_slide_missing_style_reference_hint",
+                    "slide_id": slide_id,
+                    "expected_treatment_key": treatment_key,
+                    "style_reference_layout_hint": style_hint,
+            }
+        )
+
+
+def _assert_style_reference_resolution(
+    failures: list[dict[str, Any]],
+    resolved_outline: dict[str, Any],
+) -> None:
+    summary = (
+        resolved_outline.get("resolved_treatment_summary", {}).get("style_reference_layout", {})
+        if isinstance(resolved_outline.get("resolved_treatment_summary"), dict)
+        else {}
+    )
+    if (
+        summary.get("playbook_version") != "style_reference_layout_playbook_v1"
+        or summary.get("style_preset") != "lab-report"
+        or int(summary.get("annotated_count") or 0) < len(EXPECTED_BINDINGS)
+        or not summary.get("reference_id")
+    ):
+        failures.append(
+            {
+                "step": "style_reference_resolution",
+                "reason": "style_reference_layout_summary_missing",
+                "summary": summary,
+            }
+        )
+    slides = resolved_outline.get("slides") if isinstance(resolved_outline.get("slides"), list) else []
+    slides_by_id = {
+        str(slide.get("slide_id") or ""): slide
+        for slide in slides
+        if isinstance(slide, dict)
+    }
+    for _, expected_variant, slide_id in EXPECTED_BINDINGS:
+        slide = slides_by_id.get(slide_id, {})
+        expected_treatment = EXPECTED_TREATMENT_KEYS.get(slide_id)
+        layout = (
+            slide.get("resolved_treatments", {}).get("style_reference_layout", {})
+            if isinstance(slide.get("resolved_treatments"), dict)
+            else {}
+        )
+        if (
+            slide.get("variant") != expected_variant
+            or layout.get("playbook_version") != "style_reference_layout_playbook_v1"
+            or layout.get("treatment_key") != expected_treatment
+            or layout.get("resolved_variant") != expected_variant
+            or layout.get("variant_source") != "style-reference-playbook-auto-bind"
+            or not layout.get("content_recipe_signature")
+        ):
+            failures.append(
+                {
+                    "step": "style_reference_resolution",
+                    "reason": "slide_style_reference_layout_missing",
+                    "slide_id": slide_id,
+                    "expected_variant": expected_variant,
+                    "expected_treatment_key": expected_treatment,
+                    "variant": slide.get("variant"),
+                    "style_reference_layout": layout,
+                }
+            )
 
 
 def _assert_readiness(failures: list[dict[str, Any]], readiness: dict[str, Any]) -> None:
@@ -329,7 +446,7 @@ def _assert_readiness(failures: list[dict[str, Any]], readiness: dict[str, Any])
         selection.get("binding_count") != 3
         or selection.get("bound_output_ids") != [OUTPUT_ID]
         or selection.get("unbound_output_ids")
-        or selection.get("variants") != ["image-sidebar", "chart", "lab-run-results"]
+        or selection.get("variants") != [variant for _, variant, _ in EXPECTED_BINDINGS]
     ):
         failures.append(
             {
@@ -763,6 +880,7 @@ def main() -> int:
             "artifact_selections.auto.json",
             "build/data_artifact_scaffold.json",
             "build/artifact_manifest_apply.json",
+            "build/outline_resolved.json",
             "build/planning_validation.json",
             "build/preflight.json",
             "build/qa/report.json",
@@ -794,9 +912,11 @@ def main() -> int:
             encoding="utf-8"
         )
         outline = _load_json(workspace / "outline.json")
+        resolved_outline = _load_json(workspace / "build" / "outline_resolved.json")
 
         _assert_manifest(failures, manifest)
         _assert_triplet_bindings(failures, selection, artifact_apply, outline)
+        _assert_style_reference_resolution(failures, resolved_outline)
         if planning.get("error_count") != 0 or planning.get("warning_count") != 0:
             failures.append(
                 {

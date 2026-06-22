@@ -37,6 +37,41 @@ CHECKS: dict[str, dict[str, str]] = {
         "lane": "style",
         "description": "Deterministic style-mix/header/footer resolution and lab-report header gallery QA.",
     },
+    "style-reference-sources": {
+        "script": "run_style_reference_sources_smoke.py",
+        "lane": "style",
+        "description": "Publish-safe source-intake manifest, preset routes, and synthetic reconstruction constraints.",
+    },
+    "style-reference": {
+        "script": "run_style_reference_catalog_smoke.py",
+        "lane": "style",
+        "description": "Synthetic style-reference catalog coverage and prompt-to-reference matching.",
+    },
+    "style-reference-starters": {
+        "script": "run_style_reference_starter_smoke.py",
+        "lane": "style",
+        "description": "All-preset style-reference starter workspaces with distinct signatures and clean render-free QA.",
+    },
+    "style-reference-resolution": {
+        "script": "run_style_reference_resolution_smoke.py",
+        "lane": "style",
+        "description": "All-preset build-time style-reference layout resolution from generic evidence slides to preset-specific variants.",
+    },
+    "style-reference-gallery": {
+        "script": "run_style_reference_gallery_smoke.py",
+        "lane": "style",
+        "description": "Synthetic style-reference gallery deck generation across representative presets.",
+    },
+    "style-reference-release": {
+        "script": "run_style_reference_release_evidence_smoke.py",
+        "lane": "rendered",
+        "description": "Rendered all-preset style-reference release evidence with contact-sheet fingerprint and visual-diversity hashes.",
+    },
+    "style-router": {
+        "script": "run_style_content_router_smoke.py",
+        "lane": "routing",
+        "description": "Style/content router prompt includes ranked references, mix plan, source intake, playbooks, and renderer treatment pools.",
+    },
     "header-gallery": {
         "script": "run_header_variant_gallery_smoke.py",
         "lane": "style",
@@ -110,15 +145,21 @@ CHECKS: dict[str, dict[str, str]] = {
 }
 
 PROFILES: dict[str, list[str]] = {
-    "routing": ["deck-start", "design-contract", "outline-handoff", "workflow"],
-    "style": ["style-mix", "header-gallery", "layout-polish", "readability-contract", "source-footers", "lab-footer-chrome"],
+    "routing": ["deck-start", "design-contract", "outline-handoff", "style-router", "workflow"],
+    "style": ["style-mix", "style-reference-sources", "style-reference", "style-reference-starters", "style-reference-resolution", "style-reference-gallery", "style-router", "header-gallery", "layout-polish", "readability-contract", "source-footers", "lab-footer-chrome"],
     "data": ["artifact-quality", "figure-whitespace", "data-workflow", "excel-workflow", "artifact-triplet", "artifact-freshness"],
-    "rendered": ["rendered-gallery", "rendered-data"],
+    "rendered": ["rendered-gallery", "style-reference-release", "rendered-data"],
     "core": [
         "deck-start",
         "design-contract",
         "outline-handoff",
         "style-mix",
+        "style-reference-sources",
+        "style-reference",
+        "style-reference-starters",
+        "style-reference-resolution",
+        "style-reference-gallery",
+        "style-router",
         "header-gallery",
         "layout-polish",
         "readability-contract",

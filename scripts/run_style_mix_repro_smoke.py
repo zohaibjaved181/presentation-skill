@@ -12,6 +12,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from style_reference_catalog import REQUIRED_CONTENT_TREATMENTS, STYLE_REFERENCE_VERSION
 from style_treatment_profiles import SUPPORTED_HEADER_VARIANTS, preset_treatment_profile
 
 
@@ -63,19 +64,29 @@ def _preset_profile_summary(repo: Path, failures: list[dict[str, Any]]) -> dict[
         header_pool = mix.get("header_variant_pool") if isinstance(mix.get("header_variant_pool"), list) else []
         footer_pool = mix.get("footer_pool") if isinstance(mix.get("footer_pool"), list) else []
         chart_pool = mix.get("chart_treatment_pool") if isinstance(mix.get("chart_treatment_pool"), list) else []
+        table_pool = mix.get("table_treatment_pool") if isinstance(mix.get("table_treatment_pool"), list) else []
         figure_pool = (
             mix.get("figure_table_treatment_pool")
             if isinstance(mix.get("figure_table_treatment_pool"), list)
             else []
         )
+        reference = profile.get("style_reference") if isinstance(profile.get("style_reference"), dict) else {}
+        content_treatments = (
+            reference.get("content_treatments")
+            if isinstance(reference.get("content_treatments"), dict)
+            else {}
+        )
         record = {
             "preset": preset,
             "family": profile.get("family"),
             "background_system": profile.get("background_system"),
+            "style_reference_id": reference.get("reference_id"),
             "header_variant_count": len(set(header_pool)),
             "footer_count": len(set(footer_pool)),
             "chart_treatment_count": len(set(chart_pool)),
+            "table_treatment_count": len(set(table_pool)),
             "figure_table_treatment_count": len(set(figure_pool)),
+            "content_treatment_count": len([key for key in REQUIRED_CONTENT_TREATMENTS if content_treatments.get(key)]),
         }
         records.append(record)
         if profile.get("profile_version") != "deck_preset_treatment_profiles_v1":
@@ -107,18 +118,46 @@ def _preset_profile_summary(repo: Path, failures: list[dict[str, Any]]) -> dict[
                     "footer_pool": footer_pool,
                 }
             )
-        if len(set(chart_pool)) < 2 or len(set(figure_pool)) < 2:
+        if len(set(chart_pool)) < 2 or len(set(table_pool)) < 2 or len(set(figure_pool)) < 2:
             failures.append(
                 {
                     "step": "preset_treatment_profile",
                     "reason": "thin_evidence_treatment_pool",
                     "preset": preset,
                     "chart_pool": chart_pool,
+                    "table_pool": table_pool,
                     "figure_pool": figure_pool,
                 }
             )
         if not str(profile.get("heading_accent_combo") or "").strip():
             failures.append({"step": "preset_treatment_profile", "reason": "missing_heading_combo", "preset": preset})
+        if (
+            reference.get("catalog_version") != STYLE_REFERENCE_VERSION
+            or reference.get("source_status") != "synthetic_original_publish_safe"
+            or not str(reference.get("style_dna") or "").strip()
+        ):
+            failures.append(
+                {
+                    "step": "preset_style_reference",
+                    "reason": "bad_reference_metadata",
+                    "preset": preset,
+                    "style_reference": reference,
+                }
+            )
+        missing_treatments = [
+            key
+            for key in REQUIRED_CONTENT_TREATMENTS
+            if not str(content_treatments.get(key) or "").strip()
+        ]
+        if missing_treatments:
+            failures.append(
+                {
+                    "step": "preset_style_reference",
+                    "reason": "missing_content_treatments",
+                    "preset": preset,
+                    "missing": missing_treatments,
+                }
+            )
     return {
         "profile_version": "deck_preset_treatment_profiles_v1",
         "preset_count": len(presets),
@@ -132,6 +171,7 @@ def _style_mix_matrix() -> dict[str, Any]:
         "title_layout_pool": ["lab-plate", "light-atlas"],
         "footer_pool": ["source-line", "standard"],
         "chart_treatment_pool": ["minimal", "facts-right"],
+        "table_treatment_pool": ["compact-ledger", "readout-sidecar"],
         "summary_callout_mode_pool": ["lab-box", "default"],
         "figure_table_treatment_pool": ["image-sidebar", "table-first"],
         "mix_rule": "Rotate small report treatments from a stable seed while preserving lab/report readability.",
@@ -183,14 +223,18 @@ def _write_outline(workspace: Path) -> None:
             {
                 "slide_id": "s2",
                 "type": "content",
-                "variant": "standard",
+                "variant": "lab-run-results",
                 "title": "Header rhythm stays bounded",
                 "subtitle": "Lab-clean content heading",
-                "bullets": [
-                    "The style seed resolves a stable header treatment pool.",
-                    "Content density and footer reserve stay within report defaults.",
-                    "Changing the seed should change treatment choices without changing the outline source.",
+                "headers": ["Treatment", "Pool", "Constraint"],
+                "rows": [
+                    ["Header", "6 variants", "Seeded"],
+                    ["Footer", "2 modes", "Bounded"],
+                    ["Table", "2 treatments", "Readable"],
+                    ["Repeat build", "Stable", "Required"],
                 ],
+                "column_weights": [1.0, 0.9, 1.0],
+                "interpretation": "The style seed resolves small report treatments while keeping density and footer reserve inside report defaults.",
                 "sources": ["Synthetic style mix smoke"],
             },
             {
@@ -226,6 +270,25 @@ def _write_outline(workspace: Path) -> None:
                 "verdict": "Use style_mix_matrix for restrained variation, not per-slide novelty.",
                 "sources": ["Synthetic style mix smoke"],
             },
+            {
+                "slide_id": "s5",
+                "type": "content",
+                "variant": "standard",
+                "treatment_key": "table",
+                "title": "Generic source resolves through the lab playbook",
+                "subtitle": "Source outline stays simple / resolved outline gets evidence layout",
+                "table": {
+                    "headers": ["Input", "Resolver", "Result"],
+                    "rows": [
+                        ["Source variant", "standard", "generic"],
+                        ["Treatment key", "table", "explicit"],
+                        ["Resolved variant", "lab-run-results", "playbook"],
+                    ],
+                    "column_weights": [1.2, 1.0, 1.0],
+                },
+                "interpretation": "The style-reference playbook can choose a lab evidence variant without mutating outline.json.",
+                "sources": ["Synthetic style reference layout smoke"],
+            },
         ],
     }
     _write_json(workspace / "outline.json", outline)
@@ -248,8 +311,8 @@ def _write_content_plan(workspace: Path) -> None:
                 "slide_id": "s2",
                 "role": "evidence",
                 "message": "Show bounded header rhythm.",
-                "variant": "standard",
-                "visual_strategy": "lab-clean report header with compact body",
+                "variant": "lab-run-results",
+                "visual_strategy": "compact treatment table with lab-clean report header",
                 "evidence_needs": [],
             },
             {
@@ -268,25 +331,42 @@ def _write_content_plan(workspace: Path) -> None:
                 "visual_strategy": "two-column comparison",
                 "evidence_needs": [],
             },
+            {
+                "slide_id": "s5",
+                "role": "evidence",
+                "message": "Show that a generic table source resolves through the lab-report playbook.",
+                "variant": "standard",
+                "treatment_key": "table",
+                "visual_strategy": "resolved lab-run-results evidence table",
+                "evidence_needs": [],
+            },
         ],
     }
     _write_json(workspace / "content_plan.json", plan)
 
 
-def _resolved_deck_style(workspace: Path) -> dict[str, Any]:
+def _resolved_outline(workspace: Path) -> dict[str, Any]:
     payload = _load_json(workspace / "build" / "outline_resolved.json")
-    if not isinstance(payload, dict):
-        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _resolved_deck_style(workspace: Path) -> dict[str, Any]:
+    payload = _resolved_outline(workspace)
     style = payload.get("deck_style")
     return style if isinstance(style, dict) else {}
 
 
 def _resolved_treatment_summary(workspace: Path) -> dict[str, Any]:
-    payload = _load_json(workspace / "build" / "outline_resolved.json")
-    if not isinstance(payload, dict):
-        return {}
+    payload = _resolved_outline(workspace)
     summary = payload.get("resolved_treatment_summary")
     return summary if isinstance(summary, dict) else {}
+
+
+def _style_reference_layout(summary: Any) -> dict[str, Any]:
+    if not isinstance(summary, dict):
+        return {}
+    layout = summary.get("style_reference_layout")
+    return layout if isinstance(layout, dict) else {}
 
 
 def _run_checked(
@@ -295,7 +375,9 @@ def _run_checked(
     cwd: Path,
     command_results: list[dict[str, Any]],
     failures: list[dict[str, Any]],
+    allowed_returncodes: set[int] | None = None,
 ) -> None:
+    allowed = allowed_returncodes if allowed_returncodes is not None else {0}
     result = _run(cmd, cwd=cwd)
     command_results.append(
         {
@@ -304,7 +386,7 @@ def _run_checked(
             "stdout_tail": result.stdout[-1200:],
         }
     )
-    if result.returncode != 0:
+    if result.returncode not in allowed:
         failures.append({"step": Path(cmd[1]).name, "returncode": result.returncode})
 
 
@@ -376,8 +458,6 @@ def main() -> int:
             "--skip-render",
             "--fail-on-planning-warnings",
             "--overwrite",
-            "--build-report",
-            str(build_dir / "style_mix_build_a.json"),
         ]
         readiness_cmd = [
             py,
@@ -397,6 +477,20 @@ def main() -> int:
             "--next-action-markdown",
             str(build_dir / "style_mix_next_action.md"),
         ]
+        delivery_cmd = [
+            py,
+            str(repo / "scripts" / "report_delivery_readiness.py"),
+            "--workspace",
+            str(workspace),
+            "--allow-skip-render",
+        ]
+        advance_delivery_cmd = [
+            py,
+            str(repo / "scripts" / "advance_delivery.py"),
+            "--workspace",
+            str(workspace),
+            "--allow-skip-render",
+        ]
         for cmd in (validate_cmd, build_cmd, readiness_cmd):
             _run_checked(cmd, cwd=repo, command_results=command_results, failures=failures)
 
@@ -409,11 +503,38 @@ def main() -> int:
         )
         resolved_a = _resolved_deck_style(workspace)
         treatment_a = _resolved_treatment_summary(workspace)
+        resolved_outline_a = _resolved_outline(workspace)
         resolved_a_text = (workspace / "build" / "outline_resolved.json").read_text(encoding="utf-8")
         _run_checked(advance_cmd, cwd=repo, command_results=command_results, failures=failures)
         next_action_markdown = (
             (build_dir / "style_mix_next_action.md").read_text(encoding="utf-8")
             if (build_dir / "style_mix_next_action.md").exists()
+            else ""
+        )
+        _run_checked(
+            delivery_cmd,
+            cwd=repo,
+            command_results=command_results,
+            failures=failures,
+            allowed_returncodes={0, 1},
+        )
+        _run_checked(
+            advance_delivery_cmd,
+            cwd=repo,
+            command_results=command_results,
+            failures=failures,
+            allowed_returncodes={0, 1},
+        )
+        delivery_report = _load_json(build_dir / "delivery_readiness.json")
+        delivery_advance = _load_json(build_dir / "delivery_advance_report.json")
+        delivery_markdown = (
+            (build_dir / "delivery_readiness.md").read_text(encoding="utf-8")
+            if (build_dir / "delivery_readiness.md").exists()
+            else ""
+        )
+        delivery_next_action_markdown = (
+            (build_dir / "delivery_next_action.md").read_text(encoding="utf-8")
+            if (build_dir / "delivery_next_action.md").exists()
             else ""
         )
 
@@ -500,6 +621,14 @@ def main() -> int:
             )
         if resolved_a.get("footer_mode") not in _style_mix_matrix()["footer_pool"]:
             failures.append({"step": "resolved_style", "reason": "footer_mode_outside_pool", "value": resolved_a.get("footer_mode")})
+        if resolved_a.get("table_treatment") not in _style_mix_matrix()["table_treatment_pool"]:
+            failures.append(
+                {
+                    "step": "resolved_style",
+                    "reason": "table_treatment_outside_pool",
+                    "value": resolved_a.get("table_treatment"),
+                }
+            )
         if resolved_b.get("style_seed") != STYLE_SEED_B:
             failures.append({"step": "seed_change", "reason": "style_seed_not_updated", "style_seed": resolved_b.get("style_seed")})
         if resolved_b == resolved_a:
@@ -514,12 +643,12 @@ def main() -> int:
             for item in header_by_slide
             if isinstance(item, dict) and str(item.get("header_variant") or "").strip()
         ]
-        if len(header_by_slide) != 3:
+        if len(header_by_slide) != 4:
             failures.append(
                 {
                     "step": "resolved_treatments",
                     "reason": "content_header_treatment_count_mismatch",
-                    "expected": 3,
+                    "expected": 4,
                     "actual": len(header_by_slide),
                     "header_by_slide": header_by_slide,
                 }
@@ -541,6 +670,97 @@ def main() -> int:
                     "treatment_summary": treatment_a,
                 }
             )
+        source_outline = _load_json(workspace / "outline.json")
+        source_slides = source_outline.get("slides") if isinstance(source_outline, dict) else []
+        source_s5 = next(
+            (
+                slide
+                for slide in source_slides
+                if isinstance(slide, dict) and slide.get("slide_id") == "s5"
+            ),
+            {},
+        )
+        resolved_slides = resolved_outline_a.get("slides") if isinstance(resolved_outline_a, dict) else []
+        resolved_s5 = next(
+            (
+                slide
+                for slide in resolved_slides
+                if isinstance(slide, dict) and slide.get("slide_id") == "s5"
+            ),
+            {},
+        )
+        layout_summary = (
+            treatment_a.get("style_reference_layout")
+            if isinstance(treatment_a.get("style_reference_layout"), dict)
+            else {}
+        )
+        layout_records = (
+            layout_summary.get("variant_by_slide")
+            if isinstance(layout_summary.get("variant_by_slide"), list)
+            else []
+        )
+        s5_record = next(
+            (
+                item
+                for item in layout_records
+                if isinstance(item, dict) and item.get("slide_id") == "s5"
+            ),
+            {},
+        )
+        s5_layout = (
+            resolved_s5.get("resolved_treatments", {}).get("style_reference_layout")
+            if isinstance(resolved_s5.get("resolved_treatments"), dict)
+            else {}
+        )
+        if source_s5.get("variant") != "standard":
+            failures.append(
+                {
+                    "step": "style_reference_layout_resolution",
+                    "reason": "source_outline_was_mutated",
+                    "source_variant": source_s5.get("variant"),
+                }
+            )
+        if resolved_s5.get("variant") != "lab-run-results":
+            failures.append(
+                {
+                    "step": "style_reference_layout_resolution",
+                    "reason": "generic_table_slide_not_resolved",
+                    "resolved_variant": resolved_s5.get("variant"),
+                }
+            )
+        if (
+            layout_summary.get("playbook_version") != "style_reference_layout_playbook_v1"
+            or int(layout_summary.get("applied_count") or 0) < 1
+        ):
+            failures.append(
+                {
+                    "step": "style_reference_layout_resolution",
+                    "reason": "layout_summary_missing_or_empty",
+                    "layout_summary": layout_summary,
+                }
+            )
+        if not s5_record.get("applied") or s5_record.get("resolved_variant") != "lab-run-results":
+            failures.append(
+                {
+                    "step": "style_reference_layout_resolution",
+                    "reason": "s5_resolution_record_missing",
+                    "s5_record": s5_record,
+                }
+            )
+        if (
+            not isinstance(s5_layout, dict)
+            or s5_layout.get("variant_source") != "style-reference-playbook"
+            or s5_layout.get("treatment_key") != "table"
+            or s5_layout.get("content_recipe_library_version") != "style_reference_content_recipe_library_v1"
+            or not str(s5_layout.get("content_recipe_signature") or "").strip()
+        ):
+            failures.append(
+                {
+                    "step": "style_reference_layout_resolution",
+                    "reason": "s5_slide_level_resolution_missing",
+                    "style_reference_layout": s5_layout,
+                }
+            )
         if readiness_treatment != treatment_a:
             failures.append(
                 {
@@ -550,9 +770,53 @@ def main() -> int:
                     "actual": readiness_treatment,
                 }
             )
+        delivery_treatment = (
+            delivery_report.get("resolved_treatment_summary")
+            if isinstance(delivery_report.get("resolved_treatment_summary"), dict)
+            else {}
+        )
+        delivery_advance_treatment = (
+            delivery_advance.get("resolved_treatment_summary")
+            if isinstance(delivery_advance.get("resolved_treatment_summary"), dict)
+            else {}
+        )
+        for label, treatment in (
+            ("delivery_readiness", delivery_treatment),
+            ("advance_delivery", delivery_advance_treatment),
+        ):
+            layout = _style_reference_layout(treatment)
+            records = (
+                layout.get("variant_by_slide")
+                if isinstance(layout.get("variant_by_slide"), list)
+                else []
+            )
+            s5_delivery_record = next(
+                (
+                    item
+                    for item in records
+                    if isinstance(item, dict) and item.get("slide_id") == "s5"
+                ),
+                {},
+            )
+            if (
+                layout.get("playbook_version") != "style_reference_layout_playbook_v1"
+                or layout.get("reference_id") != layout_summary.get("reference_id")
+                or int(layout.get("content_recipe_signature_count") or 0) < 1
+                or s5_delivery_record.get("resolved_variant") != "lab-run-results"
+                or not s5_delivery_record.get("content_recipe_signature")
+            ):
+                failures.append(
+                    {
+                        "step": label,
+                        "reason": "style_reference_layout_not_propagated",
+                        "style_reference_layout": layout,
+                    }
+                )
         for label, text in (
             ("workspace_readiness_markdown", readiness_markdown),
             ("workspace_next_action_markdown", next_action_markdown),
+            ("delivery_readiness_markdown", delivery_markdown),
+            ("delivery_next_action_markdown", delivery_next_action_markdown),
         ):
             if "Resolved header variants: unique=`" not in text:
                 failures.append(
@@ -561,6 +825,19 @@ def main() -> int:
                         "reason": "resolved_header_variants_missing_from_markdown",
                     }
                 )
+            for snippet in (
+                "Style-reference layouts:",
+                "recipe_signatures=`",
+                "s5:table->lab-run-results*",
+            ):
+                if snippet not in text:
+                    failures.append(
+                        {
+                            "step": label,
+                            "reason": "style_reference_layout_missing_from_markdown",
+                            "snippet": snippet,
+                        }
+                    )
         if treatment_b == treatment_a:
             failures.append(
                 {

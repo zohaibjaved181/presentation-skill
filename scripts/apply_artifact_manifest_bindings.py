@@ -11,6 +11,23 @@ from typing import Any
 
 from inspect_artifact_manifest import inspect_manifest
 
+try:
+    from style_reference_catalog import (
+        DEFAULT_TREATMENT_VARIANT_MAP,
+        LAYOUT_PLAYBOOK_VERSION,
+        preset_style_reference,
+    )
+except Exception:  # pragma: no cover - keeps standalone manifest tooling usable.
+    DEFAULT_TREATMENT_VARIANT_MAP = {
+        "figure": ["image-sidebar"],
+        "chart": ["chart"],
+        "table": ["lab-run-results"],
+    }
+    LAYOUT_PLAYBOOK_VERSION = "style_reference_layout_playbook_v1"
+
+    def preset_style_reference(_: str) -> dict[str, Any]:
+        return {}
+
 
 _STARTER_SLIDE_ID = "s2"
 _STARTER_TITLE = "Core message"
@@ -129,6 +146,141 @@ def _slide_suffix_for_variant(variant: str) -> str:
     if normalized in {"lab-run-results", "table"}:
         return "table"
     return normalized.replace("_", "-").replace(" ", "-") or "artifact"
+
+
+def _variant_treatment_key(variant: str) -> str:
+    normalized = str(variant or "").strip().lower()
+    if normalized in {"image-sidebar", "scientific-figure", "generated-image"}:
+        return "figure"
+    if normalized == "chart":
+        return "chart"
+    if normalized in {"lab-run-results", "table"}:
+        return "table"
+    if normalized in {"stats", "kpi-hero"}:
+        return "dashboard"
+    if normalized in {"comparison-2col", "matrix", "split"}:
+        return "comparison"
+    return ""
+
+
+def _design_style_preset(brief: dict[str, Any]) -> str:
+    style_system = brief.get("style_system") if isinstance(brief.get("style_system"), dict) else {}
+    for value in (
+        style_system.get("style_preset"),
+        brief.get("style_preset"),
+        brief.get("preset"),
+    ):
+        text = str(value or "").strip()
+        if text:
+            return text
+    return "executive-clinical"
+
+
+def _style_reference_context(brief: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(brief, dict):
+        return {}
+    style_preset = _design_style_preset(brief)
+    fallback = preset_style_reference(style_preset)
+    style_system = brief.get("style_system") if isinstance(brief.get("style_system"), dict) else {}
+    reference = style_system.get("style_reference") if isinstance(style_system.get("style_reference"), dict) else {}
+    reference = reference or fallback
+    playbook = reference.get("layout_playbook") if isinstance(reference.get("layout_playbook"), dict) else {}
+    if playbook.get("playbook_version") != LAYOUT_PLAYBOOK_VERSION:
+        fallback_playbook = fallback.get("layout_playbook") if isinstance(fallback.get("layout_playbook"), dict) else {}
+        playbook = fallback_playbook if fallback_playbook.get("playbook_version") == LAYOUT_PLAYBOOK_VERSION else playbook
+    treatment_map = playbook.get("treatment_variant_map") if isinstance(playbook.get("treatment_variant_map"), dict) else {}
+    return {
+        "style_preset": style_preset,
+        "reference_id": reference.get("reference_id") or fallback.get("reference_id"),
+        "reference_name": reference.get("reference_name") or fallback.get("reference_name"),
+        "playbook_version": playbook.get("playbook_version") or LAYOUT_PLAYBOOK_VERSION,
+        "treatment_variant_map": treatment_map,
+        "preferred_variants": playbook.get("preferred_variants") if isinstance(playbook.get("preferred_variants"), list) else [],
+    }
+
+
+def _unique_tokens(tokens: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for token in tokens:
+        text = str(token or "").strip()
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(text)
+    return out
+
+
+def _style_candidates_for_treatment(
+    plan: dict[str, Any],
+    treatment_key: str,
+    requested_variant: str,
+    style_context: dict[str, Any],
+) -> list[str]:
+    treatment_map = (
+        style_context.get("treatment_variant_map")
+        if isinstance(style_context.get("treatment_variant_map"), dict)
+        else {}
+    )
+    candidates: list[str] = []
+    mapped = treatment_map.get(treatment_key)
+    if isinstance(mapped, list):
+        candidates.extend(str(item).strip() for item in mapped)
+    recommendation = _layout_recommendation(plan)
+    priority = recommendation.get("priority_variants") if isinstance(recommendation.get("priority_variants"), list) else []
+    candidates.extend(
+        str(item).strip()
+        for item in priority
+        if _variant_treatment_key(str(item).strip()) == treatment_key
+    )
+    candidates.append(requested_variant)
+    default_map = DEFAULT_TREATMENT_VARIANT_MAP if isinstance(DEFAULT_TREATMENT_VARIANT_MAP, dict) else {}
+    default_candidates = default_map.get(treatment_key)
+    if isinstance(default_candidates, list):
+        candidates.extend(str(item).strip() for item in default_candidates)
+    return _unique_tokens(candidates)
+
+
+def _resolve_style_variant_for_request(
+    plan: dict[str, Any],
+    *,
+    requested_variant: str,
+    available: set[str],
+    selected_variants: set[str],
+    style_context: dict[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    treatment_key = _variant_treatment_key(requested_variant)
+    if not treatment_key:
+        return requested_variant if requested_variant in available and requested_variant not in selected_variants else "", {}
+    candidates = _style_candidates_for_treatment(plan, treatment_key, requested_variant, style_context)
+    candidates.extend(
+        variant
+        for variant in sorted(available)
+        if _variant_treatment_key(variant) == treatment_key
+    )
+    for candidate in _unique_tokens(candidates):
+        if candidate not in available or candidate in selected_variants:
+            continue
+        variant_source = (
+            "style-reference-playbook-auto-bind"
+            if isinstance(style_context, dict) and style_context.get("reference_id")
+            else "artifact-manifest-auto-bind"
+        )
+        hint = {
+            "playbook_version": style_context.get("playbook_version") or LAYOUT_PLAYBOOK_VERSION,
+            "style_preset": style_context.get("style_preset"),
+            "reference_id": style_context.get("reference_id"),
+            "reference_name": style_context.get("reference_name"),
+            "treatment_key": treatment_key,
+            "requested_variant": requested_variant,
+            "resolved_variant": candidate,
+            "variant_source": variant_source,
+        }
+        return candidate, {key: value for key, value in hint.items() if value}
+    return "", {}
 
 
 def _compact_source_label(text: str) -> str:
@@ -354,9 +506,11 @@ def generate_auto_selections(
     output_ids: list[str] | None = None,
     variants: list[str] | None = None,
     mode: str = "all",
+    design_brief: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     requested_variants = variants or ["image-sidebar", "chart", "lab-run-results"]
     selected_ids = {item for item in (output_ids or []) if item}
+    style_context = _style_reference_context(design_brief)
     selections: list[dict[str, Any]] = []
     for plan in report.get("alias_plan") or []:
         if not isinstance(plan, dict):
@@ -365,19 +519,33 @@ def generate_auto_selections(
         if not output_id or (selected_ids and output_id not in selected_ids):
             continue
         available = _available_variants(plan)
+        selected_variants: set[str] = set()
         for variant in _variant_order_for_mode(plan, requested_variants, mode):
-            if variant not in available:
+            resolved_variant, style_hint = _resolve_style_variant_for_request(
+                plan,
+                requested_variant=variant,
+                available=available,
+                selected_variants=selected_variants,
+                style_context=style_context,
+            )
+            if not resolved_variant:
                 continue
-            suffix = _slide_suffix_for_variant(variant)
+            selected_variants.add(resolved_variant)
+            suffix = _slide_suffix_for_variant(resolved_variant)
+            treatment_key = str(style_hint.get("treatment_key") or _variant_treatment_key(resolved_variant)).strip()
             selections.append(
                 {
                     "output_id": output_id,
-                    "variant": variant,
+                    "variant": resolved_variant,
                     "slide_id": f"{output_id}_{suffix}",
-                    "title": _auto_selection_title(plan, variant),
+                    "title": _auto_selection_title(plan, resolved_variant),
                     "message": _auto_selection_message(plan),
                     "selected_columns": _selected_columns(plan),
-                    **_auto_selection_extras(plan, variant),
+                    **({"treatment_key": treatment_key} if treatment_key else {}),
+                    **({"requested_variant": variant} if variant != resolved_variant else {}),
+                    **({"variant_source": style_hint.get("variant_source")} if style_hint.get("variant_source") else {}),
+                    **({"style_reference_layout_hint": style_hint} if style_hint else {}),
+                    **_auto_selection_extras(plan, resolved_variant),
                 }
             )
     return selections
@@ -414,6 +582,15 @@ def _selection_slide(selection: dict[str, Any], plan: dict[str, Any]) -> tuple[d
         "slide_id": slide_id,
         "title": str(selection.get("title") or plan.get("title") or output_id),
     }
+    treatment_key = str(selection.get("treatment_key") or _variant_treatment_key(variant)).strip()
+    if treatment_key:
+        slide["treatment_key"] = treatment_key
+    variant_source = str(selection.get("variant_source") or "").strip()
+    if variant_source:
+        slide["variant_source"] = variant_source
+    style_hint = selection.get("style_reference_layout_hint")
+    if isinstance(style_hint, dict) and style_hint:
+        slide["style_reference_layout_hint"] = style_hint
     selected_columns = _selection_selected_columns(selection, plan)
     if selected_columns:
         slide["selected_columns"] = selected_columns
@@ -475,6 +652,12 @@ def _selection_content_plan_entry(
         "visual_strategy": visual_strategy,
         "evidence_needs": [output_id] if output_id else [],
     }
+    treatment_key = str(slide.get("treatment_key") or selection.get("treatment_key") or _variant_treatment_key(variant)).strip()
+    if treatment_key:
+        entry["treatment_key"] = treatment_key
+    style_hint = selection.get("style_reference_layout_hint") or slide.get("style_reference_layout_hint")
+    if isinstance(style_hint, dict) and style_hint:
+        entry["style_reference_layout_hint"] = style_hint
     selected_columns = _selection_selected_columns(selection, plan)
     if selected_columns:
         entry["selected_columns"] = selected_columns
@@ -599,6 +782,12 @@ def _selection_evidence_item(
         "source_note": source_note,
         "used_on_slides": [slide_id] if slide_id else [],
     }
+    treatment_key = str(slide.get("treatment_key") or selection.get("treatment_key") or _variant_treatment_key(variant)).strip()
+    if treatment_key:
+        item["treatment_key"] = treatment_key
+    style_hint = selection.get("style_reference_layout_hint") or slide.get("style_reference_layout_hint")
+    if isinstance(style_hint, dict) and style_hint:
+        item["style_reference_layout_hint"] = style_hint
     if source_path:
         item["source_path"] = source_path
     selected_columns = _selection_selected_columns(selection, plan)
@@ -636,6 +825,13 @@ def _is_default_starter_slide(slide: dict[str, Any]) -> bool:
     )
 
 
+def _is_style_reference_starter_slide(slide: dict[str, Any]) -> bool:
+    return (
+        str(slide.get("type") or "").strip() == "content"
+        and str(slide.get("starter_kind") or "").strip() == "style_reference"
+    )
+
+
 def _remove_default_starter_slides(outline: dict[str, Any]) -> list[str]:
     slides = outline.get("slides")
     if not isinstance(slides, list):
@@ -643,7 +839,9 @@ def _remove_default_starter_slides(outline: dict[str, Any]) -> list[str]:
     kept: list[Any] = []
     removed: list[str] = []
     for slide in slides:
-        if isinstance(slide, dict) and _is_default_starter_slide(slide):
+        if isinstance(slide, dict) and (
+            _is_default_starter_slide(slide) or _is_style_reference_starter_slide(slide)
+        ):
             slide_id = str(slide.get("slide_id") or _STARTER_SLIDE_ID).strip()
             if slide_id:
                 removed.append(slide_id)
@@ -963,6 +1161,8 @@ def apply_selection_payload(
     content_plan_entries: list[dict[str, Any]] = []
     evidence_entries: list[dict[str, Any]] = []
     required_by_slide: dict[str, list[str]] = {}
+    treatment_keys: list[str] = []
+    style_reference_layout_hints: list[dict[str, Any]] = []
     generated_by = str(report.get("generated_by") or "").strip()
     for selection in selections:
         output_id = str(selection.get("output_id") or selection.get("id") or "").strip()
@@ -971,6 +1171,17 @@ def apply_selection_payload(
             raise ValueError(f"selection references unknown manifest output {output_id!r}")
         slide, required_ids = _selection_slide(selection, plan)
         slides.append(slide)
+        treatment_key = str(slide.get("treatment_key") or "").strip()
+        if treatment_key and treatment_key not in treatment_keys:
+            treatment_keys.append(treatment_key)
+        style_hint = slide.get("style_reference_layout_hint")
+        if isinstance(style_hint, dict) and style_hint:
+            style_reference_layout_hints.append(
+                {
+                    "slide_id": str(slide.get("slide_id") or ""),
+                    **style_hint,
+                }
+            )
         content_plan_entries.append(_selection_content_plan_entry(selection, slide, plan))
         evidence_entries.append(
             _selection_evidence_item(selection, slide, plan, generated_by=generated_by)
@@ -1039,6 +1250,8 @@ def apply_selection_payload(
         "content_plan_slide_refs": changed_content_refs,
         "evidence_ids": changed_evidence_ids,
         "required_artifact_ids_by_slide": required_by_slide,
+        "treatment_keys": treatment_keys,
+        "style_reference_layout_hints": style_reference_layout_hints,
         "outline_changed": outline_changed,
         "content_plan_changed": content_changed,
         "evidence_plan_changed": evidence_changed,
@@ -1111,6 +1324,9 @@ def main() -> int:
     try:
         if args.auto_select:
             manifest_report = inspect_manifest(workspace, manifest_path)
+            design_brief = _read_json(workspace / "design_brief.json", {})
+            if not isinstance(design_brief, dict):
+                design_brief = {}
             variants = _parse_csv_tokens(
                 str(args.variants or ""),
                 default=["image-sidebar", "chart", "lab-run-results"],
@@ -1120,6 +1336,7 @@ def main() -> int:
                 output_ids=[str(item).strip() for item in args.output_id if str(item).strip()],
                 variants=variants,
                 mode=args.auto_select_mode,
+                design_brief=design_brief,
             )
             if not selections:
                 raise ValueError("auto-select did not find any matching manifest outputs and variants")

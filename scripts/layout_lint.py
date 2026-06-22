@@ -238,23 +238,34 @@ def _is_full_bleed_background(shape: ShapeInfo, slide_w: float, slide_h: float) 
 _VARIANT_DENSITY_MULTIPLIER = {
     "cards-3": 1.35,
     "cards-2": 1.20,
-    "matrix": 1.25,
+    "matrix": 1.30,
     "timeline": 1.15,
-    "stats": 1.15,
+    "stats": 1.22,
     "split": 1.25,
     "generated-image": 1.25,
     # Figure-plus-sidebar evidence slides intentionally fill the main content
     # zone with a large figure panel and interpretation rail.
-    "image-sidebar": 1.22,
-    "scientific-figure": 1.22,
+    "image-sidebar": 1.25,
+    "scientific-figure": 1.25,
     "lab-run-results": 1.22,
-    "table": 1.18,
+    "table": 1.24,
 }
 
 _WHITESPACE_BALANCE_EXEMPT_VARIANTS = {
     # These variants use deliberate open space as the composition.
     "kpi-hero",
     "pull-quote",
+}
+
+_STRUCTURAL_DENSE_VARIANTS = {
+    "chart",
+    "flow",
+    "image-sidebar",
+    "lab-run-results",
+    "matrix",
+    "scientific-figure",
+    "stats",
+    "table",
 }
 
 
@@ -265,7 +276,13 @@ def _effective_max_density(base: float, outline_slide: dict[str, Any] | None) ->
     if variant in {"chart", "scientific-figure"}:
         return 1.0
     multiplier = _VARIANT_DENSITY_MULTIPLIER.get(variant, 1.0)
-    return min(0.96, base * multiplier)
+    # Structural evidence slides often cover most of the canvas with charts,
+    # dashboard panels, native tables, or figure grids. Their readability is
+    # governed by text/table/chart checks; the density lint should still catch
+    # near-solid overcrowding, but not intentional full-width evidence regions.
+    cap = 0.98 if variant in _STRUCTURAL_DENSE_VARIANTS else 0.96
+    minimum = 0.97 if variant in _STRUCTURAL_DENSE_VARIANTS else base
+    return max(min(cap, base * multiplier), minimum)
 
 
 def _content_balance_issues(

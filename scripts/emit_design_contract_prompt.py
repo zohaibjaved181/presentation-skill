@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from style_reference_catalog import REQUIRED_CONTENT_TREATMENTS, rank_style_references, style_reference_mix_plan
 from style_treatment_profiles import preset_treatment_profile
 
 
@@ -310,6 +311,394 @@ def _workspace_context(workspace: Path | None) -> str:
     return "\n".join(blocks)
 
 
+def _renderer_treatment_context_for_preset(preset: Any) -> dict[str, Any]:
+    profile = preset_treatment_profile(str(preset or "").strip() or "executive-clinical")
+    return {
+        "renderer_treatment_signature": profile.get("renderer_treatment_signature"),
+        "renderer_treatment_defaults": profile.get("renderer_treatment_defaults"),
+        "renderer_treatment_fields": profile.get("renderer_treatment_fields"),
+    }
+
+
+def _style_reference_match_context(user_prompt: str) -> str:
+    matches = rank_style_references(user_prompt, limit=5)
+    mix_plan = style_reference_mix_plan(user_prompt, limit=3)
+    primary = mix_plan.get("primary") if isinstance(mix_plan.get("primary"), dict) else {}
+    secondaries = (
+        mix_plan.get("secondary_influences")
+        if isinstance(mix_plan.get("secondary_influences"), list)
+        else []
+    )
+    reference_by_preset = {
+        str(item.get("style_preset") or ""): (
+            item.get("reference") if isinstance(item.get("reference"), dict) else {}
+        )
+        for item in matches
+        if isinstance(item, dict)
+    }
+    primary_reference = reference_by_preset.get(str(primary.get("style_preset") or ""), {})
+    concise_mix_plan = {
+        "mix_plan_version": mix_plan.get("mix_plan_version"),
+        "query_summary": str(mix_plan.get("query") or "")[:700],
+        "primary_treatment_archetype_ids": _compact_treatment_archetype_ids(
+            primary_reference.get("layout_playbook")
+        ),
+        "style_source_intake": _compact_source_pattern_intake(primary_reference.get("style_source_intake")),
+        "secondary_influences": [
+            _compact_secondary_mix_influence(item)
+            for item in secondaries
+            if isinstance(item, dict)
+        ],
+        "treatment_mix": _compact_treatment_mix(mix_plan.get("treatment_mix")),
+        "primary": {
+            "style_preset": primary.get("style_preset"),
+            "score": primary.get("score"),
+            "reference_id": primary.get("reference_id"),
+            "reference_name": primary.get("reference_name"),
+            "style_dna": primary.get("style_dna"),
+            "structural_motif_library": _compact_structural_motif(primary.get("structural_motif_library")),
+            "style_metric_profile": _compact_style_metric_profile(primary_reference.get("style_metric_profile")),
+            "layout_playbook": _compact_layout_playbook(primary_reference.get("layout_playbook")),
+            "style_source_intake": _compact_source_intake(primary_reference.get("style_source_intake")),
+            "content_recipe_library": _compact_recipe_plan(primary_reference.get("content_recipe_library")),
+            **_renderer_treatment_context_for_preset(primary.get("style_preset")),
+        },
+        "mixing_rules": mix_plan.get("mixing_rules"),
+    }
+    compact = [
+        {
+            "style_preset": item.get("style_preset"),
+            "score": item.get("score"),
+            "reference_id": _load_reference_field(item, "reference_id"),
+            "reference_name": _load_reference_field(item, "reference_name"),
+            **_renderer_treatment_context_for_preset(item.get("style_preset")),
+            "style_dna": _load_reference_field(item, "style_dna"),
+            "structural_motif_library": _compact_structural_motif(
+                _load_reference_field(item, "structural_motif_library")
+            ),
+            "style_metric_profile": _compact_style_metric_profile(
+                _load_reference_field(item, "style_metric_profile")
+            ),
+            "style_source_intake": _compact_source_intake(
+                _load_reference_field(item, "style_source_intake")
+            ),
+            "signature_moves": _load_reference_field(item, "signature_moves"),
+            "content_treatments": _load_reference_field(item, "content_treatments"),
+            "content_recipe_library": _compact_content_recipe_library(
+                item.get("reference") if isinstance(item.get("reference"), dict) else {}
+            ),
+            "example_storyboard": _load_reference_field(item, "example_storyboard"),
+            "layout_playbook": _compact_layout_playbook(_load_reference_field(item, "layout_playbook")),
+            "publish_safety": _load_reference_field(item, "publish_safety"),
+        }
+        for item in matches
+    ]
+    return _compact_json(
+        {
+            "purpose": (
+            "Use these synthetic style references as publish-safe design-memory hints. "
+            "Do not copy external/proprietary slide geometry; recreate with generic source content."
+            ),
+            "mix_plan": concise_mix_plan,
+            "matches": compact,
+        },
+        limit=10500,
+    )
+
+
+def _load_reference_field(match: dict[str, Any], key: str) -> Any:
+    reference = match.get("reference") if isinstance(match.get("reference"), dict) else {}
+    return reference.get(key)
+
+
+def _compact_content_recipe_library(reference: dict[str, Any]) -> dict[str, Any]:
+    library = reference.get("content_recipe_library") if isinstance(reference.get("content_recipe_library"), dict) else {}
+    recipes = library.get("recipes") if isinstance(library.get("recipes"), dict) else {}
+    compact_recipes: dict[str, Any] = {}
+    for key, recipe in recipes.items():
+        if not isinstance(recipe, dict):
+            continue
+        compact_recipes[str(key)] = {
+            "primary_variants": recipe.get("primary_variants"),
+            "required_slots": recipe.get("required_slots"),
+            "data_roles": recipe.get("data_roles"),
+            "treatment_archetype": _compact_treatment_archetypes(
+                {str(key): recipe.get("treatment_archetype")}
+            ).get(str(key)),
+        }
+    return {
+        "library_version": library.get("library_version"),
+        "recipe_signature_keys": sorted((library.get("recipe_signatures") or {}).keys())
+        if isinstance(library.get("recipe_signatures"), dict)
+        else [],
+        "recipes": compact_recipes,
+    }
+
+
+def _compact_treatment_archetype_ids(value: Any) -> dict[str, str]:
+    playbook = value if isinstance(value, dict) else {}
+    archetypes = playbook.get("treatment_archetypes") if isinstance(playbook.get("treatment_archetypes"), dict) else {}
+    out: dict[str, str] = {}
+    for treatment_key in REQUIRED_CONTENT_TREATMENTS:
+        item = archetypes.get(treatment_key) if isinstance(archetypes.get(treatment_key), dict) else {}
+        archetype_id = str(item.get("archetype_id") or "").strip()
+        if archetype_id:
+            out[treatment_key] = archetype_id
+    return out
+
+
+def _semantic_archetype_signature(item: dict[str, Any]) -> str:
+    material = {
+        "structure": item.get("structure"),
+        "object_pattern": item.get("object_pattern"),
+        "required_fields": item.get("required_fields") if isinstance(item.get("required_fields"), list) else [],
+        "primary_variants": item.get("primary_variants") if isinstance(item.get("primary_variants"), list) else [],
+        "title_layout": item.get("title_layout"),
+        "footer_mode": item.get("footer_mode"),
+        "content_goal": item.get("content_goal"),
+    }
+    return hashlib.sha256(
+        json.dumps(material, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
+def _compact_structural_motif(value: Any) -> dict[str, Any]:
+    motif = value if isinstance(value, dict) else {}
+    return {
+        "motif_library_version": motif.get("motif_library_version"),
+        "background_structure": motif.get("background_structure"),
+        "layout_motifs": motif.get("layout_motifs") if isinstance(motif.get("layout_motifs"), list) else [],
+        "content_object_rules": (
+            motif.get("content_object_rules")
+            if isinstance(motif.get("content_object_rules"), list)
+            else []
+        ),
+        "motif_signature": motif.get("motif_signature"),
+    }
+
+
+def _compact_style_metric_profile(value: Any) -> dict[str, Any]:
+    profile = value if isinstance(value, dict) else {}
+    return {
+        "metric_profile_version": profile.get("metric_profile_version"),
+        "density_level": profile.get("density_level"),
+        "whitespace_ratio_target": profile.get("whitespace_ratio_target"),
+        "body_words_per_content_slide": (
+            profile.get("body_words_per_content_slide")
+            if isinstance(profile.get("body_words_per_content_slide"), list)
+            else []
+        ),
+        "max_primary_objects": profile.get("max_primary_objects"),
+        "visual_hierarchy": profile.get("visual_hierarchy"),
+        "evidence_object_mix": (
+            profile.get("evidence_object_mix")
+            if isinstance(profile.get("evidence_object_mix"), dict)
+            else {}
+        ),
+        "source_burden": profile.get("source_burden"),
+        "footer_posture": profile.get("footer_posture"),
+        "artifact_bias": profile.get("artifact_bias") if isinstance(profile.get("artifact_bias"), list) else [],
+        "readability_bias": (
+            profile.get("readability_bias")
+            if isinstance(profile.get("readability_bias"), list)
+            else []
+        ),
+        "metric_signature": profile.get("metric_signature"),
+    }
+
+
+def _compact_layout_playbook(value: Any) -> dict[str, Any]:
+    playbook = value if isinstance(value, dict) else {}
+    return {
+        "playbook_version": playbook.get("playbook_version"),
+        "treatment_archetypes": _compact_treatment_archetypes(playbook.get("treatment_archetypes")),
+        "preferred_variants": (
+            playbook.get("preferred_variants")
+            if isinstance(playbook.get("preferred_variants"), list)
+            else []
+        )[:10],
+        "treatment_variant_map": (
+            playbook.get("treatment_variant_map")
+            if isinstance(playbook.get("treatment_variant_map"), dict)
+            else {}
+        ),
+        "opening_sequence": (
+            playbook.get("opening_sequence")
+            if isinstance(playbook.get("opening_sequence"), list)
+            else []
+        )[:6],
+        "content_rules": (
+            playbook.get("content_rules")
+            if isinstance(playbook.get("content_rules"), list)
+            else []
+        )[:5],
+        "avoid_variants": (
+            playbook.get("avoid_variants")
+            if isinstance(playbook.get("avoid_variants"), list)
+            else []
+        ),
+    }
+
+
+def _compact_treatment_archetypes(value: Any) -> dict[str, Any]:
+    archetypes = value if isinstance(value, dict) else {}
+    compact: dict[str, Any] = {}
+    for treatment_key in REQUIRED_CONTENT_TREATMENTS:
+        item = archetypes.get(treatment_key) if isinstance(archetypes.get(treatment_key), dict) else {}
+        if not item:
+            continue
+        compact[treatment_key] = {
+            "archetype_id": item.get("archetype_id"),
+            "treatment_key": item.get("treatment_key") or treatment_key,
+            "structure": item.get("structure"),
+            "object_pattern": item.get("object_pattern"),
+            "required_fields": item.get("required_fields") if isinstance(item.get("required_fields"), list) else [],
+            "primary_variants": item.get("primary_variants") if isinstance(item.get("primary_variants"), list) else [],
+            "title_layout": item.get("title_layout"),
+            "footer_mode": item.get("footer_mode"),
+            "archetype_signature": item.get("archetype_signature"),
+            "semantic_signature": item.get("semantic_signature") or _semantic_archetype_signature(item),
+        }
+    return compact
+
+
+def _compact_source_intake(value: Any) -> dict[str, Any]:
+    intake = value if isinstance(value, dict) else {}
+    compact_sources: list[dict[str, Any]] = []
+    for source in intake.get("sources", []):
+        if not isinstance(source, dict):
+            continue
+        compact_sources.append(
+            {
+                "source_id": source.get("source_id"),
+                "source_status": source.get("source_status"),
+                "allowed_extractions": (
+                    source.get("allowed_extractions")
+                    if isinstance(source.get("allowed_extractions"), list)
+                    else []
+                )[:4],
+                "generic_style_observations": (
+                    source.get("generic_style_observations")
+                    if isinstance(source.get("generic_style_observations"), list)
+                    else []
+                )[:3],
+                "generic_slide_patterns": (
+                    source.get("generic_slide_patterns")
+                    if isinstance(source.get("generic_slide_patterns"), list)
+                    else []
+                )[:3],
+                "forbidden_materials": (
+                    source.get("forbidden_materials")
+                    if isinstance(source.get("forbidden_materials"), list)
+                    else []
+                )[:4],
+            }
+        )
+    return {
+        "manifest_version": intake.get("manifest_version"),
+        "route_id": intake.get("route_id"),
+        "derivation_mode": intake.get("derivation_mode"),
+        "source_ids": intake.get("source_ids") if isinstance(intake.get("source_ids"), list) else [],
+        "required_synthetic_content": (
+            intake.get("required_synthetic_content")
+            if isinstance(intake.get("required_synthetic_content"), list)
+            else []
+        ),
+        "sources": compact_sources,
+    }
+
+
+def _compact_source_pattern_intake(value: Any) -> dict[str, Any]:
+    intake = value if isinstance(value, dict) else {}
+    patterns: list[str] = []
+    observations: list[str] = []
+    for source in intake.get("sources", []):
+        if not isinstance(source, dict):
+            continue
+        for pattern in source.get("generic_slide_patterns", []):
+            if isinstance(pattern, str) and pattern not in patterns:
+                patterns.append(pattern)
+        for observation in source.get("generic_style_observations", []):
+            if isinstance(observation, str) and observation not in observations:
+                observations.append(observation)
+    return {
+        "manifest_version": intake.get("manifest_version"),
+        "route_id": intake.get("route_id"),
+        "source_ids": intake.get("source_ids") if isinstance(intake.get("source_ids"), list) else [],
+        "derivation_mode": intake.get("derivation_mode"),
+        "generic_slide_patterns": patterns[:8],
+        "generic_style_observations": observations[:6],
+    }
+
+
+def _compact_secondary_mix_influence(value: Any) -> dict[str, Any]:
+    item = value if isinstance(value, dict) else {}
+    motif = _compact_structural_motif(item.get("structural_motif_library"))
+    metric = _compact_style_metric_profile(item.get("style_metric_profile"))
+    return {
+        "style_preset": item.get("style_preset"),
+        "score": item.get("score"),
+        "reference_id": item.get("reference_id"),
+        "reference_name": item.get("reference_name"),
+        "style_dna": item.get("style_dna"),
+        "background_structure": motif.get("background_structure"),
+        "layout_motifs": (motif.get("layout_motifs") or [])[:4],
+        "motif_signature": motif.get("motif_signature"),
+        "metric_signature": metric.get("metric_signature"),
+        "density_level": metric.get("density_level"),
+        "body_words_per_content_slide": metric.get("body_words_per_content_slide"),
+        "max_primary_objects": metric.get("max_primary_objects"),
+        **_renderer_treatment_context_for_preset(item.get("style_preset")),
+    }
+
+
+def _compact_treatment_mix(value: Any) -> dict[str, Any]:
+    mix = value if isinstance(value, dict) else {}
+    compact: dict[str, Any] = {}
+    for treatment, details in mix.items():
+        if not isinstance(details, dict):
+            continue
+        secondary_notes: list[dict[str, Any]] = []
+        for item in details.get("optional_secondary_influences", [])[:2]:
+            if not isinstance(item, dict):
+                continue
+            secondary_notes.append(
+                {
+                    "from_style_preset": item.get("from_style_preset"),
+                    "reference_id": item.get("reference_id"),
+                    "treatment": item.get("treatment"),
+                }
+            )
+        compact[str(treatment)] = {
+            "primary": details.get("primary"),
+            "optional_secondary_influences": secondary_notes,
+        }
+    return compact
+
+
+def _compact_recipe_plan(value: Any) -> dict[str, Any]:
+    library = value if isinstance(value, dict) else {}
+    signatures = library.get("recipe_signatures") if isinstance(library.get("recipe_signatures"), dict) else {}
+    recipes = library.get("recipes") if isinstance(library.get("recipes"), dict) else {}
+    archetype_ids: dict[str, str] = {}
+    for treatment_key in REQUIRED_CONTENT_TREATMENTS:
+        recipe = recipes.get(treatment_key) if isinstance(recipes.get(treatment_key), dict) else {}
+        archetype = (
+            recipe.get("treatment_archetype")
+            if isinstance(recipe.get("treatment_archetype"), dict)
+            else {}
+        )
+        archetype_id = str(archetype.get("archetype_id") or "").strip()
+        if archetype_id:
+            archetype_ids[treatment_key] = archetype_id
+    return {
+        "library_version": library.get("library_version"),
+        "recipe_signature_keys": sorted(signatures.keys()),
+        "treatment_archetype_ids": archetype_ids,
+        "authoring_contract": (library.get("authoring_contract") if isinstance(library.get("authoring_contract"), list) else [])[:2],
+    }
+
+
 def _reference_context() -> str:
     refs = {
         "DESIGN.md": ROOT / "DESIGN.md",
@@ -343,6 +732,40 @@ posture, artifact ledger paths, replay commands, and QA evidence. This is the
 replay layer for mix-and-match styling: it should make the deck varied but not
 random, and should let a later agent rebuild the same choices without reopening
 the full prompt.
+
+Use the selected synthetic style reference's `structural_motif_library` before
+the playbook: its background structure, layout motifs, and content-object
+rules should decide whether the deck behaves like a lab run report, command
+console, workflow workbench, evidence rail, atlas plate, case-study journey, or
+editorial masthead. Copy the motif signature into `style_replay` and the motif
+rules into `structure_replay`, so a later outline author can reproduce the same
+structure instead of only the same chrome.
+Use the selected reference's `style_metric_profile` to set density,
+whitespace, body-word budget, maximum primary object count, visual hierarchy,
+evidence-object mix, source burden, footer posture, and artifact/readability
+bias. Translate it into `readability_contract`, `structure_blueprint`,
+`asset_plan`, and `reproducibility_contract.style_replay` so outline authors
+know when to split a slide or convert prose into a chart/table/figure.
+Then use the selected reference's `layout_playbook` as the primary source for
+`structure_blueprint.slide_sequence`, `allowed_variants`, and
+`forbidden_variants`. Do not let all presets collapse to the same title,
+dashboard, comparison, chart, and table order. The playbook should change the
+actual slide variants and content posture, while the renderer still uses only
+supported outline variants.
+When the style-reference context includes `mix_plan`, keep its primary
+reference authoritative for preset, layout playbook, source/footer posture, and
+supported variants. Use secondary references only as named influences for
+specific content treatments, and record those borrowed influences in
+`choice_resolution` and the structure rationale.
+Use `renderer_treatment_signature` as the compact replay/audit key for the
+title/footer/chart/table/figure/stats/matrix/callout posture. Copy the selected
+reference's `renderer_treatment_defaults` into `style_system` and
+`reproducibility_contract.style_replay`, then override only with supported
+fields when the user's evidence shape requires it.
+Use `content_recipe_library` as the content-slot grammar for each treatment:
+chart, table, figure, dashboard, comparison, decision, and references slides
+should name their treatment key, required slots, data roles, source posture, and
+supported variant choices before outline authoring.
 
 For data-derived figures, editable chart JSON, or summary tables, make the
 artifact contract auditable before outline authoring: include source path,
@@ -380,6 +803,9 @@ Available workspace context:
 
 Workspace source inventory:
 {workspace_source_inventory}
+
+Prompt-to-style reference matches:
+{style_reference_matches}
 
 Return this JSON shape:
 
@@ -432,6 +858,7 @@ Return this JSON shape:
       "intake_questions",
       "design_contract"
     ],
+    "selected_renderer_treatment_signature": "copy from the selected preset defaults, or the recomputed supported override signature",
     "replay_inputs": {{
       "answers": "intake_answers.json or explicit assumptions",
       "packet": "deck_start_packet.json",
@@ -455,6 +882,7 @@ Return this JSON shape:
       "style_system.style_preset",
       "style_system.background_system",
       "style_system.style_mix_matrix",
+      "style_system.renderer_treatment_signature",
       "structure_blueprint.slide_sequence",
       "evidence_and_assets.analysis_artifact_plan",
       "readability_contract",
@@ -473,17 +901,44 @@ Return this JSON shape:
       "style_preset": "same as style_system.style_preset",
       "palette_key": "same as style_system.palette_key",
       "background_system": "same as style_system.background_system",
+      "structural_motif_library_version": "style_reference_structural_motif_library_v1",
+      "structural_motif_signature": "copy selected reference structural_motif_library.motif_signature",
+      "background_structure": "copy selected reference structural_motif_library.background_structure",
+      "layout_motifs": ["copy selected reference structural_motif_library.layout_motifs used by the contract"],
+      "style_metric_profile_version": "style_reference_metric_profile_v1",
+      "style_metric_signature": "copy selected reference style_metric_profile.metric_signature",
+      "density_level": "copy selected reference style_metric_profile.density_level",
+      "whitespace_ratio_target": "copy selected reference style_metric_profile.whitespace_ratio_target",
+      "body_words_per_content_slide": "copy selected reference style_metric_profile.body_words_per_content_slide",
       "header_variant_pool": ["same supported entries as style_mix_matrix.header_variant_pool"],
       "title_layout_pool": ["same supported entries as style_mix_matrix.title_layout_pool"],
       "footer_pool": ["same supported entries as style_mix_matrix.footer_pool"],
       "chart_treatment_pool": ["same supported entries as style_mix_matrix.chart_treatment_pool"],
+      "table_treatment_pool": ["same supported entries as style_mix_matrix.table_treatment_pool"],
       "figure_table_treatment_pool": ["same supported entries as style_mix_matrix.figure_table_treatment_pool"],
+      "renderer_treatment_signature": "title_layout:...|footer_mode:...|chart_treatment:...|table_treatment:...|figure_table_treatment:...|stats_mode:...|matrix_mode:...|summary_callout_mode:...",
+      "renderer_treatment_defaults": {{
+        "title_layout": "split-hero | lab-plate | command-center | poster | masthead | light-atlas",
+        "footer_mode": "standard | source-line",
+        "chart_treatment": "standard | facts-below | facts-right | minimal | hero-stat | threshold-band | sparse-wide",
+        "table_treatment": "standard | compact-ledger | readout-sidecar | decision-matrix | journal-grid",
+        "figure_table_treatment": "figure-first | table-first | stats-strip | image-sidebar",
+        "stats_mode": "tiles | feature-left | policy-bands",
+        "matrix_mode": "cards | open-quadrants",
+        "summary_callout_mode": "default | lab-box"
+      }},
       "mix_rule": "one sentence describing deterministic treatment rotation from style_seed",
       "variation_boundaries": ["what may vary between sibling decks", "what must stay locked inside this deck"]
     }},
     "structure_replay": {{
       "target_slide_count": 0,
       "slide_variant_mix": ["ordered variants from structure_blueprint.slide_sequence"],
+      "content_recipe_library_version": "style_reference_content_recipe_library_v1",
+      "content_recipe_signatures": "copy selected reference content_recipe_library.recipe_signatures",
+      "treatment_archetype_semantic_signatures": "copy selected reference layout_playbook.treatment_archetypes semantic_signature values",
+      "structural_motif_library_version": "style_reference_structural_motif_library_v1",
+      "structural_motif_signature": "copy selected reference structural_motif_library.motif_signature",
+      "structural_content_object_rules": ["copy rules that changed chart/table/figure/source placement"],
       "evidence_anchor_rule": "how each evidence/data slide gets a visible chart, table, figure, or image anchor",
       "white_space_rule": "how to avoid awkward sparse or overfilled regions"
     }},
@@ -521,6 +976,136 @@ Return this JSON shape:
     "style_seed": "{style_seed}",
     "background_system": "white report | dark stage | light editorial | source-backed visual | generated concept | custom",
     "preset_treatment_profile": "copy/refine the workspace preset treatment profile so preset-specific heading/footer/chart/figure pools are reproducible",
+    "renderer_treatment_signature": "compact replay key for selected title/footer/chart/table/figure/stats/matrix/callout posture",
+    "renderer_treatment_defaults": {{
+      "title_layout": "split-hero | lab-plate | command-center | poster | masthead | light-atlas",
+      "footer_mode": "standard | source-line",
+      "chart_treatment": "standard | facts-below | facts-right | minimal | hero-stat | threshold-band | sparse-wide",
+      "table_treatment": "standard | compact-ledger | readout-sidecar | decision-matrix | journal-grid",
+      "figure_table_treatment": "figure-first | table-first | stats-strip | image-sidebar",
+      "stats_mode": "tiles | feature-left | policy-bands",
+      "matrix_mode": "cards | open-quadrants",
+      "summary_callout_mode": "default | lab-box"
+    }},
+    "style_reference": {{
+      "catalog_version": "style_reference_catalog_v1",
+      "reference_id": "copy from the selected synthetic reference",
+      "reference_name": "copy from the selected synthetic reference",
+      "source_status": "synthetic_original_publish_safe | license_clear_public_source | reconstructed_generic",
+      "style_dna": "the selected reference's reusable visual grammar",
+      "structural_motif_library": {{
+        "motif_library_version": "style_reference_structural_motif_library_v1",
+        "background_structure": "the selected reference page system",
+        "layout_motifs": ["named structure moves such as run metadata plate or workflow lanes"],
+        "content_object_rules": ["rules that place charts, tables, figures, decisions, caveats, and sources"],
+        "motif_signature": "copy from selected reference"
+      }},
+      "style_metric_profile": {{
+        "metric_profile_version": "style_reference_metric_profile_v1",
+        "density_level": "copy selected preset density posture",
+        "whitespace_ratio_target": 0.25,
+        "body_words_per_content_slide": [24, 48],
+        "max_primary_objects": 2,
+        "visual_hierarchy": "copy selected preset evidence scan path",
+        "evidence_object_mix": {{"chart": 0.25, "table": 0.25, "figure": 0.25, "prose": 0.25}},
+        "source_burden": "copy selected source burden",
+        "footer_posture": "copy selected footer/source posture",
+        "artifact_bias": ["copy selected artifact preferences"],
+        "readability_bias": ["copy selected text and density constraints"],
+        "metric_signature": "copy selected metric signature"
+      }},
+      "signature_moves": ["2-4 moves that make this deck family distinct"],
+      "example_storyboard": {{
+        "storyboard_version": "style_reference_example_storyboard_v1",
+        "topic": "synthetic example topic used only as style-memory evidence",
+        "title": "publish-safe synthetic title",
+        "chart": "chart vocabulary, labels, and readout pattern",
+        "table": "table headers/rows pattern",
+        "figure": "figure/sidebar/panel vocabulary",
+        "decision": "decision headers/rows pattern"
+      }},
+      "content_treatments": {{
+        "title": "how this reference presents title slides",
+        "comparison": "how this reference presents comparisons",
+        "chart": "how this reference presents charts",
+        "table": "how this reference presents tables",
+        "figure": "how this reference presents figures/images",
+        "dashboard": "how this reference presents dashboards",
+        "decision": "how this reference presents decisions",
+        "references": "how this reference presents sources/refs"
+      }},
+      "content_recipe_library": {{
+        "library_version": "style_reference_content_recipe_library_v1",
+        "recipe_signatures": "copy from selected reference",
+        "authoring_contract": ["how treatment-key recipes must be used before outline authoring"]
+      }},
+      "publish_safety": {{
+        "status": "publish_safe",
+        "basis": "synthetic reference or license-clear public source notes"
+      }},
+      "style_source_intake": {{
+        "manifest_version": "style_reference_source_manifest_v1",
+        "route_id": "copy from selected reference",
+        "source_ids": ["license/public-guidance source ids"],
+        "derivation_mode": "metadata_only | synthetic_reconstruction | linked_attribution",
+        "publish_safety": {{
+          "status": "publish_safe_descriptor",
+          "basis": "source URLs and license notes are recorded; bundled deck material is not copied"
+        }}
+      }},
+      "layout_playbook": {{
+        "playbook_version": "style_reference_layout_playbook_v1",
+        "preferred_variants": ["ordered supported outline variants for this preset"],
+        "treatment_variant_map": {{
+          "title": ["title"],
+          "comparison": ["comparison-2col", "split", "matrix"],
+          "chart": ["chart"],
+          "table": ["table", "lab-run-results"],
+          "figure": ["image-sidebar", "scientific-figure", "flow"],
+          "dashboard": ["stats", "lab-run-results"],
+          "decision": ["standard", "table"],
+          "references": ["table"]
+        }},
+        "treatment_archetypes": {{
+          "title": {{
+            "archetype_id": "selected title archetype such as lab-run-metadata-plate-opener",
+            "structure": "how the opener is organized beyond the title variant",
+            "required_fields": ["scope", "evidence promise", "decision context"],
+            "title_layout": "split-hero | lab-plate | command-center | poster | masthead | light-atlas",
+            "archetype_signature": "copy selected reference archetype signature",
+            "semantic_signature": "copy selected semantic signature that excludes preset/id naming"
+          }},
+          "chart": {{
+            "archetype_id": "selected body archetype such as clean-assay-report-chart-readout",
+            "structure": "how this treatment presents evidence beyond the renderer variant",
+            "object_pattern": "chart/table/figure/dashboard/decision object grammar",
+            "required_fields": ["evidence object", "readout", "caveat", "source"],
+            "primary_variants": ["supported outline variants for the treatment"],
+            "archetype_signature": "copy selected reference archetype signature",
+            "semantic_signature": "copy selected semantic signature that excludes preset/id naming"
+          }},
+          "references": {{
+            "archetype_id": "selected source/provenance archetype such as lab-source-id-refs-table",
+            "structure": "how footers, page numbers, source IDs, and references tables work",
+            "required_fields": ["source id", "claim link", "usage note"],
+            "footer_mode": "standard | source-line",
+            "archetype_signature": "copy selected reference archetype signature",
+            "semantic_signature": "copy selected semantic signature that excludes preset/id naming"
+          }}
+        }},
+        "slide_archetypes": [
+          {{
+            "role": "evidence",
+            "variant": "chart",
+            "treatment_key": "chart",
+            "layout_note": "reference-specific composition note"
+          }}
+        ],
+        "opening_sequence": [],
+        "content_rules": ["rules that make this preset structurally distinct"],
+        "avoid_variants": ["variants to avoid for this reference"]
+      }}
+    }},
     "header_system": {{
       "header_mode": "bar | stack | eyebrow | lab-clean | lab-card",
       "header_variant": "auto | left-accent | split-rule | title-rule | side-rail | top-bottom-rule | plain",
@@ -543,10 +1128,11 @@ Return this JSON shape:
       "section_count": 0
     }},
     "figure_table_system": {{
-      "figure_table_treatment": "figure-first | table-first | stats-strip | image-sidebar"
+      "figure_table_treatment": "figure-first | table-first | stats-strip | image-sidebar",
+      "table_treatment": "standard | compact-ledger | readout-sidecar | decision-matrix | journal-grid"
     }},
     "chart_system": {{
-      "chart_treatment": "standard | facts-below | facts-right | minimal"
+      "chart_treatment": "standard | facts-below | facts-right | minimal | hero-stat | threshold-band | sparse-wide"
     }},
     "style_mix_matrix": {{
       "header_variant_pool": ["left-accent", "split-rule", "title-rule", "side-rail", "top-bottom-rule", "plain"],
@@ -556,7 +1142,8 @@ Return this JSON shape:
       "matrix_mode_pool": ["cards", "open-quadrants"],
       "stats_mode_pool": ["tiles", "feature-left", "policy-bands"],
       "cards_mode_pool": ["feature-left", "staggered-row"],
-      "chart_treatment_pool": ["standard", "facts-below", "facts-right", "minimal"],
+      "chart_treatment_pool": ["standard", "facts-below", "facts-right", "minimal", "hero-stat", "threshold-band", "sparse-wide"],
+      "table_treatment_pool": ["standard", "compact-ledger", "readout-sidecar", "decision-matrix", "journal-grid"],
       "summary_callout_mode_pool": ["default", "lab-box"],
       "figure_table_treatment_pool": ["figure-first", "table-first", "stats-strip", "image-sidebar"],
       "footer_pool": ["source-line", "standard", "none"],
@@ -571,6 +1158,7 @@ Return this JSON shape:
         "slide_id": "s1",
         "role": "title | context | evidence | method | comparison | implication | close",
         "variant": "supported outline variant",
+        "treatment_key": "title | comparison | chart | table | figure | dashboard | decision | references",
         "visual_strategy": "figure | table | image-sidebar | cards | flow | narrative",
         "required_assets": [],
         "source_policy": "none | cite key claim | source every factual claim"
@@ -800,6 +1388,7 @@ def render_contract_prompt(*, user_prompt: str, workspace: Path | None) -> str:
         style_seed=stable_id,
         workspace_context=_workspace_context(workspace),
         workspace_source_inventory=_compact_json(_workspace_source_inventory(workspace), limit=3500),
+        style_reference_matches=_style_reference_match_context(user_prompt),
         reference_context=_reference_context(),
     )
 

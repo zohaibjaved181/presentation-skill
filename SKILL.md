@@ -45,6 +45,9 @@ generator, slides generator, deck builder, presentation generator.
 - `references/reference_script_patterns.md`: reusable PPTX/DOCX/figure
   patterns from stronger one-off scripts; read when improving routing,
   scientific decks, or companion document workflows.
+- `references/style_reference_catalog.md`: publish-safe style-reference
+  policy for using public decks, screenshots, PPTX corpora, and synthetic
+  recreations without bundling proprietary material.
 - `references/dynamic_design_and_subagents.md`: bounded dynamic design
   modulation plus when to use content, data, routing, critique, and QA
   subagents.
@@ -94,9 +97,66 @@ generator, slides generator, deck builder, presentation generator.
 - `scripts/apply_pptx_style_fragment.py`: deterministic bridge from extracted
   PPTX style fragments to `design_brief.json`, `renderer_treatments`,
   `style_import`, and `notes.md`.
+- `scripts/style_reference_catalog.py`: synthetic publish-safe style DNA and
+  content-treatment references for each preset, including title, comparison,
+  chart, table, figure, dashboard, decision, and references behavior plus the
+  `style_reference_mix_plan_v1` prompt matcher and
+  `style_reference_layout_playbook_v1` variant map and
+  `style_reference_structural_motif_library_v1` motif grammar plus
+  `style_reference_metric_profile_v1` density/whitespace/object-bias metrics
+  plus `style_reference_content_recipe_library_v1` content-slot recipes used
+  by design-contract and outline-authoring prompts.
+- `references/style_reference_sources.json` and
+  `scripts/style_reference_sources.py`: publish-safe source-intake manifest and
+  validator for public decks, screenshots, PPTX corpora, and template-gallery
+  inspiration. Use this before adding or citing external style references; it
+  records license notes, source-verification evidence, allowed extraction
+  modes, forbidden materials, generic style observations, reusable slide
+  pattern extracts, attribution posture, and per-preset synthetic
+  reconstruction routes.
+- `references/style_inspiration_corpus.json` and
+  `scripts/style_inspiration_corpus.py`: descriptor-only inspiration corpus for
+  public design systems, presentation tooling, template indexes, and slide
+  design heuristics. Use it as a scalable source-index layer for prompt-to-style
+  routing and subagent scouting; it stores rights posture, extraction limits,
+  layout/palette/typography descriptors, per-preset routes, and the safety rule
+  that no raw decks, screenshots, logos, proprietary text, or distinctive
+  copied geometry are bundled.
+- `scripts/build_style_reference_gallery.py`: generated reference-gallery
+  decks that turn the synthetic style catalog into actual title, dashboard,
+  comparison, chart, table, figure, decision, and references slides without
+  bundling external template assets. The gallery summary records per-preset
+  variant sequences, structural playbook signatures, structural motif
+  signatures, content-recipe signatures, renderer-treatment signatures,
+  treatment buckets, rendered contact-sheet paths, per-treatment contact-sheet
+  paths, per-preset contact-sheet collections for `overview`, `data_evidence`,
+  and `decision_sources`, and QA totals for release evidence.
+- `scripts/run_style_reference_gallery_smoke.py`: focused fast smoke proving
+  all-preset style-reference gallery decks keep unique content signatures,
+  required treatment coverage, publish-safe metadata, and clean render-free QA.
+- `scripts/run_style_reference_resolution_smoke.py`: all-preset build-time
+  resolver smoke proving identical generic evidence slides resolve into
+  preset-specific `build/outline_resolved.json` variants with unique treatment
+  signatures.
+- `scripts/run_style_content_router_smoke.py`: focused fast smoke proving the
+  style/content router prompt includes ranked style-reference matches,
+  mix-plan context, layout playbooks, content recipes, and renderer treatment
+  pools for prompt-to-reference routing.
+- `scripts/run_style_reference_release_evidence_smoke.py`: optional rendered
+  release-evidence smoke proving the all-preset gallery has clean QA,
+  unique content signatures, visual-diversity hashes, fingerprinted contact
+  sheets, rendered slide evidence for every required treatment key, and
+  per-treatment rendered thumbnail and coarse-layout signatures so
+  repeated-looking treatment families are visible and blocked in release
+  evidence.
+- `scripts/run_style_reference_starter_smoke.py`: all-preset starter smoke
+  proving initialized `style_reference_starter_outline_v1` workspaces keep
+  distinct scaffold signatures, publish-safe source metadata, starter assets,
+  and clean render-free QA.
 - `scripts/style_treatment_profiles.py`: reusable preset treatment profiles
   for supported heading/accent, footer, chart, and figure/table pools across
-  all loadable presets.
+  all loadable presets. Profiles include a `style_reference_catalog_v1`
+  reference so agents get more than surface-level chrome variation.
 - `scripts/build_header_variant_gallery.py`: visual fixture builder for
   checking clean content-header variants across all presets.
 - `scripts/run_header_variant_gallery_smoke.py`: focused fast smoke proving
@@ -783,8 +843,115 @@ New workspaces also record `style_system.preset_treatment_profile` from
 `scripts/style_treatment_profiles.py`; design-contract prompts and deck-start
 packets surface the same `deck_preset_treatment_profiles_v1` profile so scouts
 can preserve preset-specific heading/accent, footer, chart, and figure/table
-pools instead of inventing unsupported treatments. Treat the profile as the
-starting point and refine it only inside supported renderer fields.
+pools instead of inventing unsupported treatments. The profile also carries
+`renderer_treatment_defaults` and a `renderer_treatment_signature`, a compact
+replay/audit key for the selected title, footer, chart, table, figure, stats,
+matrix, and summary-callout posture. Design-contract prompts must preserve
+that signature in `style_system`, `choice_resolution`, and
+`reproducibility_contract.style_replay`; `apply_design_contract.py` will
+synthesize it from supported fields when older contracts omit it. That profile
+embeds a
+`style_reference_catalog_v1` reference from
+`scripts/style_reference_catalog.py`, which acts as the preset's publish-safe
+style memory: title, comparison, chart, table, figure, dashboard, decision, and
+references treatment rules, plus style DNA, signature moves, and anti-patterns.
+Each reference also carries `style_reference_example_storyboard_v1`, a
+publish-safe synthetic topic with chart labels, dashboard facts, table rows,
+figure/sidebar sections, comparison states, decision rows, and source notes, so
+gallery decks and design scouts vary actual content grammar rather than only
+renderer chrome.
+It also carries `style_reference_mix_plan_v1` and
+`style_reference_layout_playbook_v1`: the mix plan chooses one primary
+reference plus bounded secondary influences for hybrid prompts, while the
+playbook defines preferred variants, treatment-to-variant mappings, gallery
+showcase variants, treatment-level `treatment_archetypes`, opening sequence,
+content rules, and variants to avoid. The `treatment_archetypes` entries name
+the opener, comparison, chart, table, figure, dashboard, decision, and
+source/provenance posture, so presets differ in body-slide grammar and
+footer/reference behavior even when two presets share a renderer variant such
+as `chart`, `table`, or `comparison-2col`.
+Each reference also carries `style_reference_structural_motif_library_v1`,
+with the preset's background structure, layout motifs, content-object rules,
+and motif signature. Treat this as the first guard against same-looking
+presets: the motif grammar decides whether the deck is an evidence rail,
+workflow workbench, atlas plate, command console, lab run report, editorial
+masthead, or case-study journey before colors and header chrome are chosen.
+Each reference also carries `style_reference_metric_profile_v1`, with the
+preset's density level, whitespace target, body-word budget, maximum primary
+object count, visual hierarchy, chart/table/figure/prose mix, source burden,
+footer posture, artifact bias, readability bias, and replayable metric
+signature. Treat this as the guard against applying the same body-slide
+density and object count to every preset.
+The same reference carries `style_reference_content_recipe_library_v1`, with
+one recipe for each treatment key. These recipes name required content slots,
+data roles, supported primary variants, source posture, authoring checks, and
+a replayable recipe signature so chart/table/figure/dashboard/decision slides
+are structurally different for each preset before any renderer chrome is
+applied. Every recipe also carries the selected treatment archetype signature.
+Outline-authoring handoffs should record selected recipes in
+`contract_alignment.content_recipe_library_used.slide_recipe_map` and record
+the used archetypes in
+`contract_alignment.layout_playbook_used.treatment_archetypes_used`.
+Fresh workspaces created by `scripts/init_deck_workspace.py` use
+`style_reference_starter_outline_v1`: after the stable title/core-message
+starter, the outline includes a few synthetic preset-specific scaffold slides
+marked `starter_kind: style_reference`. Treat them as reusable style memory and
+replace them with topic-specific sourced content before delivery. The
+initializer also writes deterministic local starter assets under
+`assets/style_reference/` and `assets/icons/` so image-sidebar,
+scientific-figure, flow, matrix, and card scaffolds can render without network
+or proprietary media.
+Preset profiles also carry chart, table, and figure/table treatment pools;
+use `table_treatment` values such as `compact-ledger`, `readout-sidecar`,
+`decision-matrix`, and `journal-grid` when an editable table needs a distinct
+report, dashboard, decision, or editorial posture.
+Treat the profile/reference as the starting point and refine it only inside
+supported renderer fields. The design-contract prompt and outline-authoring
+prompt must use the primary playbook so presets change actual slide structure,
+not only header chrome or color; any secondary borrowed treatment must be
+recorded in `choice_resolution`. During `build_workspace.py`, the same
+playbook is also applied to `build/outline_resolved.json`: compatible generic
+source slides can resolve to preset-specific variants such as
+`lab-run-results`, while explicit source variants remain authoritative. The
+resolved choices are auditable in
+`resolved_treatments.style_reference_layout`, including the selected reference
+ID, treatment key, source/resolved variant, content-recipe library version, and
+content-recipe signature.
+When using web slide decks, public PPTX files, screenshots, or template
+galleries as inspiration, follow `references/style_reference_catalog.md`: store
+only license-clear assets with attribution or reconstructed synthetic
+descriptors/examples with generic content. Do not bundle proprietary source
+slides, screenshots, branding, private data, or distinctive copied geometry.
+Record any reusable public-source route in
+`references/style_reference_sources.json` and validate it with
+`python3 scripts/style_reference_sources.py --validate`; each preset route
+must name source URLs, rights posture, source-verification evidence, allowed
+extraction modes, forbidden materials, generic style observations, reusable
+slide pattern extracts, attribution policy, and the synthetic content required
+to replace the original deck material. The emitted `style_source_intake` field travels
+with `style_reference_catalog_v1` references and gallery metadata, so scouts
+can see what may inspire a preset without treating public sources as bundled
+templates.
+When changing the synthetic reference catalog, prompt-to-reference matching,
+or required content-treatment coverage, run `npm run check:style-reference`.
+That check covers all loadable presets with prompt-routing score/margin probes
+plus hybrid mix-plan secondary-influence probes, not only schema validity.
+When changing generated reference-gallery examples, catalog-to-outline mapping,
+or the actual synthetic decks used as style memory, run
+`npm run check:style-reference-gallery`; it now builds all loadable presets
+and verifies per-preset treatment coverage plus unique first-four content
+signatures.
+When changing rendered gallery release evidence, contact-sheet creation,
+visual-diversity hashing, treatment-level layout floors, or release comparison
+artifacts, run `npm run check:style-reference-release`.
+When changing style-reference starter scaffolds, starter asset creation, or
+preset-specific scaffold signatures, run
+`npm run check:style-reference-starters`.
+When changing build-time style-reference layout resolution, playbook treatment
+maps, generic-to-specific variant compatibility, or resolved-outline metadata,
+run `npm run check:style-reference-resolution`.
+When changing prompt-to-style routing, style/content scout output shape, or
+router subagent guidance, run `npm run check:style-router`.
 When changing style pools, header variants, or seed handling, run
 `npm run check:style-mix` for a fast init/validate/build/readiness smoke plus
 lab-report header-variant gallery build/QA coverage before the full

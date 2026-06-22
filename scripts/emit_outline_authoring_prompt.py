@@ -11,10 +11,13 @@ one outline-authoring subagent.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
 from typing import Any
+
+from style_reference_catalog import REQUIRED_CONTENT_TREATMENTS, preset_style_reference
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -160,6 +163,220 @@ def _slide_quality_context(workspace: Path, limit: int = 4000) -> str:
     return "<no slide_quality_contract found; derive conservative readability, whitespace, evidence-anchor, artifact, and QA targets from design_brief/readability_contract/qa_contract>"
 
 
+def _style_preset_from_payload(payload: Any) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    for key in ("style_system", "visual_system"):
+        container = payload.get(key)
+        if isinstance(container, dict):
+            preset = str(container.get("style_preset") or "").strip()
+            if preset:
+                return preset
+    return str(payload.get("style_preset") or "").strip()
+
+
+def _compact_treatment_archetype_ids(reference: dict[str, Any]) -> dict[str, str]:
+    playbook = reference.get("layout_playbook") if isinstance(reference.get("layout_playbook"), dict) else {}
+    archetypes = playbook.get("treatment_archetypes") if isinstance(playbook.get("treatment_archetypes"), dict) else {}
+    out: dict[str, str] = {}
+    for treatment_key in REQUIRED_CONTENT_TREATMENTS:
+        archetype = archetypes.get(treatment_key) if isinstance(archetypes.get(treatment_key), dict) else {}
+        archetype_id = str(archetype.get("archetype_id") or "").strip()
+        if archetype_id:
+            out[treatment_key] = archetype_id
+    return out
+
+
+def _semantic_archetype_signature(item: dict[str, Any]) -> str:
+    material = {
+        "structure": item.get("structure"),
+        "object_pattern": item.get("object_pattern"),
+        "required_fields": item.get("required_fields") if isinstance(item.get("required_fields"), list) else [],
+        "primary_variants": item.get("primary_variants") if isinstance(item.get("primary_variants"), list) else [],
+        "title_layout": item.get("title_layout"),
+        "footer_mode": item.get("footer_mode"),
+        "content_goal": item.get("content_goal"),
+    }
+    return hashlib.sha256(
+        json.dumps(material, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
+def _compact_treatment_archetypes(reference: dict[str, Any]) -> dict[str, Any]:
+    playbook = reference.get("layout_playbook") if isinstance(reference.get("layout_playbook"), dict) else {}
+    archetypes = playbook.get("treatment_archetypes") if isinstance(playbook.get("treatment_archetypes"), dict) else {}
+    out: dict[str, Any] = {}
+    for treatment_key in REQUIRED_CONTENT_TREATMENTS:
+        archetype = archetypes.get(treatment_key) if isinstance(archetypes.get(treatment_key), dict) else {}
+        if not archetype:
+            continue
+        out[treatment_key] = {
+            "archetype_id": archetype.get("archetype_id"),
+            "structure": archetype.get("structure"),
+            "object_pattern": archetype.get("object_pattern"),
+            "required_fields": archetype.get("required_fields") if isinstance(archetype.get("required_fields"), list) else [],
+            "primary_variants": archetype.get("primary_variants") if isinstance(archetype.get("primary_variants"), list) else [],
+            "title_layout": archetype.get("title_layout"),
+            "footer_mode": archetype.get("footer_mode"),
+            "semantic_signature": archetype.get("semantic_signature") or _semantic_archetype_signature(archetype),
+        }
+    return out
+
+
+def _compact_recipe_library(reference: dict[str, Any]) -> dict[str, Any]:
+    library = reference.get("content_recipe_library") if isinstance(reference.get("content_recipe_library"), dict) else {}
+    recipes = library.get("recipes") if isinstance(library.get("recipes"), dict) else {}
+    recipe_archetypes: dict[str, str] = {}
+    recipe_slots: dict[str, list[str]] = {}
+    for treatment_key in REQUIRED_CONTENT_TREATMENTS:
+        recipe = recipes.get(treatment_key) if isinstance(recipes.get(treatment_key), dict) else {}
+        archetype = recipe.get("treatment_archetype") if isinstance(recipe.get("treatment_archetype"), dict) else {}
+        archetype_id = str(archetype.get("archetype_id") or "").strip()
+        if archetype_id:
+            recipe_archetypes[treatment_key] = archetype_id
+        slots = recipe.get("required_slots") if isinstance(recipe.get("required_slots"), list) else []
+        if slots:
+            recipe_slots[treatment_key] = [str(item) for item in slots[:4] if str(item).strip()]
+    return {
+        "library_version": library.get("library_version"),
+        "recipe_archetype_ids": recipe_archetypes,
+        "required_slots_by_treatment": recipe_slots,
+        "recipe_signatures": library.get("recipe_signatures") if isinstance(library.get("recipe_signatures"), dict) else {},
+        "authoring_contract": library.get("authoring_contract") if isinstance(library.get("authoring_contract"), list) else [],
+    }
+
+
+def _compact_style_source_intake(reference: dict[str, Any]) -> dict[str, Any]:
+    intake = reference.get("style_source_intake") if isinstance(reference.get("style_source_intake"), dict) else {}
+    patterns: list[str] = []
+    observations: list[str] = []
+    for source in intake.get("sources", []):
+        if not isinstance(source, dict):
+            continue
+        patterns.extend(str(item) for item in source.get("generic_slide_patterns", [])[:2] if str(item).strip())
+        observations.extend(str(item) for item in source.get("generic_style_observations", [])[:2] if str(item).strip())
+    return {
+        "route_id": intake.get("route_id"),
+        "source_ids": intake.get("source_ids") if isinstance(intake.get("source_ids"), list) else [],
+        "derivation_mode": intake.get("derivation_mode"),
+        "use_cases": intake.get("use_cases") if isinstance(intake.get("use_cases"), list) else [],
+        "required_synthetic_content": (
+            intake.get("required_synthetic_content")
+            if isinstance(intake.get("required_synthetic_content"), list)
+            else []
+        ),
+        "generic_slide_patterns": patterns[:6],
+        "generic_style_observations": observations[:6],
+    }
+
+
+def _compact_style_metric_profile(reference: dict[str, Any]) -> dict[str, Any]:
+    profile = reference.get("style_metric_profile") if isinstance(reference.get("style_metric_profile"), dict) else {}
+    return {
+        "metric_profile_version": profile.get("metric_profile_version"),
+        "density_level": profile.get("density_level"),
+        "whitespace_ratio_target": profile.get("whitespace_ratio_target"),
+        "body_words_per_content_slide": (
+            profile.get("body_words_per_content_slide")
+            if isinstance(profile.get("body_words_per_content_slide"), list)
+            else []
+        ),
+        "max_primary_objects": profile.get("max_primary_objects"),
+        "visual_hierarchy": profile.get("visual_hierarchy"),
+        "evidence_object_mix": (
+            profile.get("evidence_object_mix")
+            if isinstance(profile.get("evidence_object_mix"), dict)
+            else {}
+        ),
+        "source_burden": profile.get("source_burden"),
+        "footer_posture": profile.get("footer_posture"),
+        "artifact_bias": profile.get("artifact_bias") if isinstance(profile.get("artifact_bias"), list) else [],
+        "readability_bias": (
+            profile.get("readability_bias")
+            if isinstance(profile.get("readability_bias"), list)
+            else []
+        ),
+        "metric_signature": profile.get("metric_signature"),
+    }
+
+
+def _compact_style_reference_authoring_payload(source: str, payload: Any, reference: dict[str, Any]) -> dict[str, Any]:
+    playbook = reference.get("layout_playbook") if isinstance(reference.get("layout_playbook"), dict) else {}
+    motif = reference.get("structural_motif_library") if isinstance(reference.get("structural_motif_library"), dict) else {}
+    return {
+        "source": source,
+        "style_preset": _style_preset_from_payload(payload),
+        "reference_id": reference.get("reference_id"),
+        "reference_name": reference.get("reference_name"),
+        "style_dna": reference.get("style_dna"),
+        "treatment_archetype_ids": _compact_treatment_archetype_ids(reference),
+        "style_source_intake": _compact_style_source_intake(reference),
+        "style_metric_profile": _compact_style_metric_profile(reference),
+        "layout_playbook": {
+            "playbook_version": playbook.get("playbook_version"),
+            "preferred_variants": playbook.get("preferred_variants") if isinstance(playbook.get("preferred_variants"), list) else [],
+            "gallery_showcase_variants": (
+                playbook.get("gallery_showcase_variants")
+                if isinstance(playbook.get("gallery_showcase_variants"), list)
+                else []
+            ),
+            "treatment_variant_map": (
+                playbook.get("treatment_variant_map")
+                if isinstance(playbook.get("treatment_variant_map"), dict)
+                else {}
+            ),
+            "treatment_archetypes": _compact_treatment_archetypes(reference),
+            "opening_sequence": playbook.get("opening_sequence") if isinstance(playbook.get("opening_sequence"), list) else [],
+            "content_rules": playbook.get("content_rules") if isinstance(playbook.get("content_rules"), list) else [],
+            "avoid_variants": playbook.get("avoid_variants") if isinstance(playbook.get("avoid_variants"), list) else [],
+        },
+        "content_recipe_library": _compact_recipe_library(reference),
+        "structural_motif_library": {
+            "motif_library_version": motif.get("motif_library_version"),
+            "background_structure": motif.get("background_structure"),
+            "layout_motifs": motif.get("layout_motifs") if isinstance(motif.get("layout_motifs"), list) else [],
+            "content_object_rules": motif.get("content_object_rules") if isinstance(motif.get("content_object_rules"), list) else [],
+            "motif_signature": motif.get("motif_signature"),
+        },
+        "signature_moves": reference.get("signature_moves"),
+        "content_treatments": reference.get("content_treatments"),
+        "avoid": reference.get("avoid"),
+    }
+
+
+def _style_reference_authoring_context(workspace: Path, limit: int = 5500) -> str:
+    for path in (workspace / "design_brief.json", workspace / "design_contract.json"):
+        payload = _load_json(path)
+        if not isinstance(payload, dict):
+            continue
+        style_system = payload.get("style_system") if isinstance(payload.get("style_system"), dict) else {}
+        reference = style_system.get("style_reference") if isinstance(style_system.get("style_reference"), dict) else {}
+        if isinstance(reference, dict) and reference:
+            preset = _style_preset_from_payload(payload) or "executive-clinical"
+            fallback = preset_style_reference(preset)
+            if not isinstance(reference.get("layout_playbook"), dict):
+                reference = dict(reference)
+                reference["layout_playbook"] = fallback.get("layout_playbook", {})
+            if not isinstance(reference.get("content_recipe_library"), dict):
+                reference = dict(reference)
+                reference["content_recipe_library"] = fallback.get("content_recipe_library", {})
+            if not isinstance(reference.get("structural_motif_library"), dict):
+                reference = dict(reference)
+                reference["structural_motif_library"] = fallback.get("structural_motif_library", {})
+            if not isinstance(reference.get("style_source_intake"), dict):
+                reference = dict(reference)
+                reference["style_source_intake"] = fallback.get("style_source_intake", {})
+            if not isinstance(reference.get("style_metric_profile"), dict):
+                reference = dict(reference)
+                reference["style_metric_profile"] = fallback.get("style_metric_profile", {})
+            return _compact_json(_compact_style_reference_authoring_payload(str(path), payload, reference), limit)
+    design_brief = _load_json(workspace / "design_brief.json")
+    design_contract = _load_json(workspace / "design_contract.json")
+    preset = _style_preset_from_payload(design_brief) or _style_preset_from_payload(design_contract) or "executive-clinical"
+    reference = preset_style_reference(preset)
+    return _compact_json(_compact_style_reference_authoring_payload("fallback from scripts/style_reference_catalog.py", design_brief or design_contract or {"style_preset": preset}, reference), limit)
+
+
 PROMPT_TEMPLATE = """\
 You are authoring the source outline for a reproducible PowerPoint deck.
 
@@ -183,8 +400,78 @@ Return this JSON shape:
   "contract_alignment": {{
     "style_seed": "copied from design_contract/design_brief",
     "style_preset": "copied from contract",
+    "style_reference_id": "copied from style_reference.layout_playbook context",
     "header_footer_plan": "how the locked header/footer system is used",
-    "variant_mix_plan": "how structure_blueprint.allowed_variants are used without random cycling"
+    "variant_mix_plan": "how structure_blueprint.allowed_variants and style_reference.layout_playbook preferred_variants are used without random cycling",
+    "structural_motif_library_used": {{
+      "motif_library_version": "style_reference_structural_motif_library_v1",
+      "background_structure": "selected reference background_structure",
+      "layout_motifs_used": ["motifs that changed the outline, such as run metadata plate or workflow lanes"],
+      "content_object_rules_used": ["content-object rules that changed chart/table/figure/source placement"],
+      "motif_signature": "selected structural motif signature"
+    }},
+    "style_metric_profile_used": {{
+      "metric_profile_version": "style_reference_metric_profile_v1",
+      "metric_signature": "selected reference metric signature",
+      "density_level": "selected reference density posture",
+      "whitespace_ratio_target": "selected reference whitespace target",
+      "body_words_per_content_slide": "selected reference body word budget",
+      "max_primary_objects": "selected reference object-count limit",
+      "visual_hierarchy": "selected reference evidence scan path",
+      "evidence_object_mix": "selected reference chart/table/figure/prose weights"
+    }},
+    "layout_playbook_used": {{
+      "playbook_version": "style_reference_layout_playbook_v1",
+      "preferred_variants": ["ordered variants actually used"],
+      "treatment_archetypes_used": {{
+        "title": "chosen title archetype_id and structure from layout_playbook.treatment_archetypes.title",
+        "comparison": "chosen comparison archetype_id and object pattern",
+        "chart": "chosen chart archetype_id and object pattern",
+        "table": "chosen table archetype_id and object pattern",
+        "figure": "chosen figure archetype_id and object pattern",
+        "dashboard": "chosen dashboard archetype_id and object pattern",
+        "decision": "chosen decision archetype_id and object pattern",
+        "references": "chosen references archetype_id and source/provenance structure"
+      }},
+      "treatment_archetype_semantic_signatures_used": {{
+        "title": "copy semantic_signature from layout_playbook.treatment_archetypes.title",
+        "comparison": "copy semantic_signature from layout_playbook.treatment_archetypes.comparison",
+        "chart": "copy semantic_signature from layout_playbook.treatment_archetypes.chart",
+        "table": "copy semantic_signature from layout_playbook.treatment_archetypes.table",
+        "figure": "copy semantic_signature from layout_playbook.treatment_archetypes.figure",
+        "dashboard": "copy semantic_signature from layout_playbook.treatment_archetypes.dashboard",
+        "decision": "copy semantic_signature from layout_playbook.treatment_archetypes.decision",
+        "references": "copy semantic_signature from layout_playbook.treatment_archetypes.references"
+      }},
+      "treatment_variant_map_used": {{
+        "title": "chosen title variant",
+        "dashboard": "chosen dashboard variant",
+        "chart": "chosen chart variant",
+        "table": "chosen table variant",
+        "figure": "chosen figure variant",
+        "comparison": "chosen comparison variant",
+        "decision": "chosen decision variant",
+        "references": "chosen references variant"
+      }},
+      "content_rules_used": ["rules from the playbook that changed outline choices"]
+    }},
+    "content_recipe_library_used": {{
+      "library_version": "style_reference_content_recipe_library_v1",
+      "recipe_signatures_used": {{
+        "chart": "signature copied when chart recipe is used",
+        "table": "signature copied when table recipe is used",
+        "figure": "signature copied when figure recipe is used"
+      }},
+      "slide_recipe_map": [
+        {{
+          "slide_id": "s3",
+          "treatment_key": "chart | table | figure | dashboard | comparison | decision | references",
+          "recipe_signature": "copied from content_recipe_library.recipes[treatment_key].recipe_signature",
+          "required_slots_filled": ["which recipe slots are filled by this slide"],
+          "data_roles_bound": ["which recipe data roles are bound to source fields/artifacts"]
+        }}
+      ]
+    }}
   }},
   "artifact_rebuild_plan": {{
     "context_version": "presentation_skill_artifact_rebuild_context_v1 or none",
@@ -301,6 +588,37 @@ Authoring rules:
   style_mix_matrix.
 - Use `structure_blueprint.slide_sequence` as the primary slide order. If a
   slide must be merged, split, or skipped, explain it in `notes_append`.
+- Before choosing slide variants, read the Style reference motif grammar and
+  layout playbook below. Use `structural_motif_library.background_structure`,
+  `layout_motifs`, and `content_object_rules` to decide whether the outline is
+  behaving like a lab run report, command console, workflow workbench,
+  evidence rail, atlas plate, case-study journey, or editorial masthead before
+  picking variants. Record the chosen motif pieces in
+  `contract_alignment.structural_motif_library_used`.
+- Apply `style_metric_profile` before writing prose: use its density level,
+  whitespace target, body-word budget, maximum primary object count, visual
+  hierarchy, evidence-object mix, source burden, and artifact/readability bias
+  to decide whether to split a slide, change variant, or convert text into a
+  chart/table/figure. Record the used values in
+  `contract_alignment.style_metric_profile_used`.
+- Then use `layout_playbook.opening_sequence` and
+  `layout_playbook.treatment_variant_map` to make the preset structurally
+  distinct. Example: lab/report decks should naturally start with
+  `lab-run-results` or `scientific-figure`, dark technical decks with `stats`,
+  `chart`, or `flow`, and editorial decks with `image-sidebar`, `split`, or
+  sparse `standard` synthesis.
+- Use `layout_playbook.treatment_archetypes` for every slide treatment, not
+  just opener/footer: title, comparison, chart, table, figure, dashboard,
+  decision, and references. Record the selected archetype IDs/object patterns
+  in `contract_alignment.layout_playbook_used.treatment_archetypes_used`.
+- Before writing each content slide, choose a recipe from
+  `content_recipe_library.recipes` by `treatment_key`. Use its
+  `required_slots`, `data_roles`, `primary_variants`, `source_posture`, and
+  `authoring_checks` to decide what the slide must contain. Record the chosen
+  recipe in `contract_alignment.content_recipe_library_used.slide_recipe_map`
+  and keep the slide's `treatment_key` in `outline_json.slides[]`.
+- Do not use variants listed in `layout_playbook.avoid_variants` unless the
+  evidence shape truly requires it; explain any exception in `notes_append`.
 - Fill `quality_alignment` from the Slide quality contract block below. It
   should name the concrete readability floors, whitespace/evidence-anchor
   rules, generated-artifact metadata expectations, and QA gates that changed
@@ -337,6 +655,9 @@ Original user request or summary:
 Slide quality contract:
 {slide_quality_context}
 
+Style reference layout playbook:
+{style_reference_context}
+
 Generated artifact aliases:
 {artifact_aliases}
 
@@ -363,6 +684,7 @@ def render_outline_authoring_prompt(
         workspace=str(resolved_workspace),
         user_prompt=user_prompt.strip() or "<infer from design_contract.json and planning files>",
         slide_quality_context=_slide_quality_context(resolved_workspace),
+        style_reference_context=_style_reference_authoring_context(resolved_workspace),
         artifact_aliases=_artifact_alias_summary(resolved_workspace),
         artifact_rebuild_context=_artifact_rebuild_context_summary(resolved_workspace),
         reference_context=_reference_context(reference_limit),

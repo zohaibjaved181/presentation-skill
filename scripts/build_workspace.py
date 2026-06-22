@@ -20,6 +20,12 @@ from office_package_hash import (
     is_office_package_path,
     office_package_normalized_sha256,
 )
+from style_reference_catalog import (
+    CONTENT_RECIPE_LIBRARY_VERSION,
+    LAYOUT_PLAYBOOK_VERSION,
+    SUPPORTED_OUTLINE_VARIANTS,
+    preset_style_reference,
+)
 
 
 _FAST_FIRST_PASS_ATTRS = {
@@ -31,6 +37,9 @@ _FAST_FIRST_PASS_ATTRS = {
     "fail_on_whitespace_warnings",
     "overwrite",
 }
+
+_GENERIC_LAYOUT_VARIANTS = {"", "standard"}
+_SUPPORTED_OUTLINE_VARIANTS = {str(item).strip().lower() for item in SUPPORTED_OUTLINE_VARIANTS}
 
 
 def _run(cmd: list[str]) -> None:
@@ -1198,6 +1207,7 @@ _DECK_STYLE_SCALAR_KEYS = {
     "stats_mode",
     "cards_mode",
     "chart_treatment",
+    "table_treatment",
     "footer_mode",
     "footer_source_label",
     "footer_refs_label",
@@ -1231,7 +1241,8 @@ _STYLE_ENUM_VALUES = {
     "matrix_mode": {"cards", "open-quadrants"},
     "stats_mode": {"tiles", "feature-left", "policy-bands"},
     "cards_mode": {"feature-left", "staggered-row"},
-    "chart_treatment": {"standard", "facts-below", "facts-right", "minimal"},
+    "chart_treatment": {"standard", "facts-below", "facts-right", "minimal", "hero-stat", "threshold-band", "sparse-wide"},
+    "table_treatment": {"standard", "compact-ledger", "readout-sidecar", "decision-matrix", "journal-grid"},
     "footer_mode": {"standard", "source-line", "none"},
     "summary_callout_mode": {"default", "lab-box"},
     "figure_table_treatment": {"figure-first", "table-first", "stats-strip", "image-sidebar"},
@@ -1536,6 +1547,7 @@ def _deck_style_from_design_brief(brief: Any) -> dict[str, Any]:
         ("stats_mode", "stats_mode_pool"),
         ("cards_mode", "cards_mode_pool"),
         ("chart_treatment", "chart_treatment_pool"),
+        ("table_treatment", "table_treatment_pool"),
         ("summary_callout_mode", "summary_callout_mode_pool"),
         ("figure_table_treatment", "figure_table_treatment_pool"),
         ("footer_mode", "footer_pool"),
@@ -1762,12 +1774,411 @@ def _annotate_resolved_slide_treatments(
     }
 
 
+def _style_reference_from_design_brief(brief: Any, style_preset: str) -> dict[str, Any]:
+    fallback = preset_style_reference(style_preset or "executive-clinical")
+    if not isinstance(brief, dict):
+        return fallback
+    style_system = brief.get("style_system") if isinstance(brief.get("style_system"), dict) else {}
+    reference = style_system.get("style_reference") if isinstance(style_system.get("style_reference"), dict) else {}
+    if not reference:
+        return fallback
+    reference = copy.deepcopy(reference)
+    if not isinstance(reference.get("layout_playbook"), dict):
+        reference["layout_playbook"] = fallback.get("layout_playbook", {})
+    if not isinstance(reference.get("content_recipe_library"), dict):
+        reference["content_recipe_library"] = fallback.get("content_recipe_library", {})
+    if not isinstance(reference.get("structural_motif_library"), dict):
+        reference["structural_motif_library"] = fallback.get("structural_motif_library", {})
+    if not isinstance(reference.get("style_source_intake"), dict):
+        reference["style_source_intake"] = fallback.get("style_source_intake", {})
+    if not isinstance(reference.get("style_metric_profile"), dict):
+        reference["style_metric_profile"] = fallback.get("style_metric_profile", {})
+    if not str(reference.get("reference_id") or "").strip():
+        reference["reference_id"] = fallback.get("reference_id")
+    if not str(reference.get("reference_name") or "").strip():
+        reference["reference_name"] = fallback.get("reference_name")
+    return reference
+
+
+def _semantic_archetype_signature(archetype: dict[str, Any]) -> str:
+    material = {
+        "structure": archetype.get("structure"),
+        "object_pattern": archetype.get("object_pattern"),
+        "required_fields": archetype.get("required_fields") if isinstance(archetype.get("required_fields"), list) else [],
+        "primary_variants": archetype.get("primary_variants") if isinstance(archetype.get("primary_variants"), list) else [],
+        "title_layout": archetype.get("title_layout"),
+        "footer_mode": archetype.get("footer_mode"),
+        "content_goal": archetype.get("content_goal"),
+    }
+    return hashlib.sha256(
+        json.dumps(material, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
+def _content_recipe_trace_for_treatment(reference: dict[str, Any], treatment_key: str) -> dict[str, Any]:
+    key = str(treatment_key or "").strip().lower()
+    library = (
+        reference.get("content_recipe_library")
+        if isinstance(reference.get("content_recipe_library"), dict)
+        else {}
+    )
+    recipes = library.get("recipes") if isinstance(library.get("recipes"), dict) else {}
+    recipe = recipes.get(key) if isinstance(recipes.get(key), dict) else {}
+    signatures = (
+        library.get("recipe_signatures")
+        if isinstance(library.get("recipe_signatures"), dict)
+        else {}
+    )
+    signature = str(signatures.get(key) or recipe.get("recipe_signature") or "").strip()
+    if not signature:
+        return {}
+    primary_variants = (
+        [
+            str(item)
+            for item in recipe.get("primary_variants", [])
+            if str(item).strip()
+        ]
+        if isinstance(recipe.get("primary_variants"), list)
+        else []
+    )
+    required_slots = (
+        [
+            str(item)
+            for item in recipe.get("required_slots", [])
+            if str(item).strip()
+        ]
+        if isinstance(recipe.get("required_slots"), list)
+        else []
+    )
+    archetype = recipe.get("treatment_archetype") if isinstance(recipe.get("treatment_archetype"), dict) else {}
+    archetype_id = str(archetype.get("archetype_id") or "").strip()
+    archetype_signature = str(archetype.get("archetype_signature") or "").strip()
+    semantic_signature = str(archetype.get("semantic_signature") or "").strip()
+    if archetype and not semantic_signature:
+        semantic_signature = _semantic_archetype_signature(archetype)
+    return {
+        "content_recipe_library_version": library.get("library_version") or CONTENT_RECIPE_LIBRARY_VERSION,
+        "content_recipe_signature": signature,
+        "content_recipe_primary_variants": primary_variants,
+        "content_recipe_required_slot_count": len(required_slots),
+        "content_recipe_archetype_id": archetype_id,
+        "content_recipe_archetype_signature": archetype_signature,
+        "content_recipe_archetype_semantic_signature": semantic_signature,
+        "treatment_archetype_id": archetype_id,
+        "treatment_archetype_signature": archetype_signature,
+        "treatment_archetype_semantic_signature": semantic_signature,
+    }
+
+
+def _slide_assets(slide: dict[str, Any]) -> dict[str, Any]:
+    assets = slide.get("assets")
+    return assets if isinstance(assets, dict) else {}
+
+
+def _has_table_payload(slide: dict[str, Any]) -> bool:
+    assets = _slide_assets(slide)
+    headers = slide.get("headers")
+    rows = slide.get("rows")
+    if isinstance(headers, list) and headers and isinstance(rows, list) and rows:
+        return True
+    for key in ("table", "table_data"):
+        if slide.get(key):
+            return True
+    for key in ("table", "table_data"):
+        if assets.get(key):
+            return True
+    tables = slide.get("tables") or slide.get("table_groups") or assets.get("tables")
+    return isinstance(tables, list) and bool(tables)
+
+
+def _has_chart_payload(slide: dict[str, Any]) -> bool:
+    assets = _slide_assets(slide)
+    return bool(slide.get("chart") or assets.get("chart_data") or assets.get("chart"))
+
+
+def _has_image_payload(slide: dict[str, Any]) -> bool:
+    assets = _slide_assets(slide)
+    return bool(
+        slide.get("image")
+        or slide.get("hero_image")
+        or assets.get("hero_image")
+        or assets.get("image")
+    )
+
+
+def _has_scientific_figure_payload(slide: dict[str, Any]) -> bool:
+    assets = _slide_assets(slide)
+    figures = slide.get("figures") or assets.get("figures")
+    return isinstance(figures, list) and bool(figures)
+
+
+def _has_stats_payload(slide: dict[str, Any]) -> bool:
+    for key in ("facts", "stats", "evidence"):
+        if isinstance(slide.get(key), list) and slide.get(key):
+            return True
+    return bool(slide.get("value") and slide.get("label"))
+
+
+def _has_comparison_payload(slide: dict[str, Any]) -> bool:
+    return isinstance(slide.get("left"), dict) and isinstance(slide.get("right"), dict)
+
+
+def _has_cards_payload(slide: dict[str, Any]) -> bool:
+    cards = slide.get("cards")
+    return isinstance(cards, list) and bool(cards)
+
+
+def _has_flow_payload(slide: dict[str, Any]) -> bool:
+    assets = _slide_assets(slide)
+    for key in ("diagram", "mermaid_source"):
+        if slide.get(key) or assets.get(key):
+            return True
+    for key in ("steps", "process", "flow"):
+        if isinstance(slide.get(key), list) and slide.get(key):
+            return True
+    return False
+
+
+def _has_timeline_payload(slide: dict[str, Any]) -> bool:
+    milestones = slide.get("milestones") or slide.get("timeline")
+    return isinstance(milestones, list) and bool(milestones)
+
+
+def _variant_supported_by_slide(slide: dict[str, Any], variant: str) -> bool:
+    variant = str(variant or "").strip().lower()
+    if variant not in _SUPPORTED_OUTLINE_VARIANTS:
+        return False
+    if variant in {"", "standard"}:
+        return True
+    if variant == "title":
+        return str(slide.get("type") or "").strip().lower() == "title"
+    if variant == "split":
+        return bool(slide.get("body") or slide.get("bullets") or slide.get("highlights"))
+    if variant in {"cards-2", "cards-3"}:
+        return _has_cards_payload(slide)
+    if variant == "timeline":
+        return _has_timeline_payload(slide)
+    if variant == "matrix":
+        quadrants = slide.get("quadrants")
+        return isinstance(quadrants, list) and len(quadrants) >= 2
+    if variant == "stats":
+        return _has_stats_payload(slide) or _has_table_payload(slide)
+    if variant == "kpi-hero":
+        return bool(slide.get("value") and slide.get("label"))
+    if variant == "table":
+        return _has_table_payload(slide)
+    if variant == "lab-run-results":
+        return _has_table_payload(slide)
+    if variant == "comparison-2col":
+        return _has_comparison_payload(slide)
+    if variant == "flow":
+        return _has_flow_payload(slide)
+    if variant == "chart":
+        return _has_chart_payload(slide)
+    if variant == "image-sidebar":
+        return _has_image_payload(slide) or _has_scientific_figure_payload(slide)
+    if variant == "scientific-figure":
+        return _has_scientific_figure_payload(slide)
+    if variant == "generated-image":
+        assets = _slide_assets(slide)
+        return bool(assets.get("generated_image") or assets.get("image") or assets.get("hero_image"))
+    return False
+
+
+def _slide_treatment_key(slide: dict[str, Any]) -> str:
+    explicit = str(slide.get("treatment_key") or "").strip().lower()
+    if explicit:
+        return explicit
+    if _has_chart_payload(slide):
+        return "chart"
+    if _has_table_payload(slide):
+        return "table"
+    if _has_scientific_figure_payload(slide) or _has_image_payload(slide):
+        return "figure"
+    if _has_comparison_payload(slide):
+        return "comparison"
+    if _has_stats_payload(slide):
+        return "dashboard"
+    slide_intent = str(slide.get("slide_intent") or slide.get("role") or "").strip().lower()
+    visual_intent = str(slide.get("visual_intent") or "").strip().lower()
+    title = str(slide.get("title") or "").strip().lower()
+    if slide_intent == "decision" or visual_intent == "decision":
+        return "decision"
+    if visual_intent in {"comparison", "compare"}:
+        return "comparison"
+    if visual_intent in {"data", "dashboard"}:
+        return "dashboard"
+    if visual_intent in {"figure", "hero", "image"}:
+        return "figure"
+    if "reference" in title or title in {"sources", "refs"}:
+        return "references"
+    return ""
+
+
+def _candidate_variants_for_treatment(playbook: dict[str, Any], treatment_key: str) -> list[str]:
+    candidates: list[str] = []
+    treatment_map = playbook.get("treatment_variant_map")
+    if isinstance(treatment_map, dict):
+        mapped = treatment_map.get(treatment_key)
+        if isinstance(mapped, list):
+            candidates.extend(str(item).strip().lower() for item in mapped)
+    preferred = playbook.get("preferred_variants")
+    if isinstance(preferred, list):
+        candidates.extend(str(item).strip().lower() for item in preferred)
+    out: list[str] = []
+    for candidate in candidates:
+        if candidate and candidate in _SUPPORTED_OUTLINE_VARIANTS and candidate not in out:
+            out.append(candidate)
+    return out
+
+
+def _resolve_playbook_variant(
+    slide: dict[str, Any],
+    playbook: dict[str, Any],
+    treatment_key: str,
+) -> str:
+    for candidate in _candidate_variants_for_treatment(playbook, treatment_key):
+        if _variant_supported_by_slide(slide, candidate):
+            return candidate
+    return ""
+
+
+def _apply_style_reference_layout_playbook(
+    resolved_outline: dict[str, Any],
+    brief: Any,
+    *,
+    style_preset: str,
+) -> dict[str, Any]:
+    slides = resolved_outline.get("slides")
+    if not isinstance(slides, list):
+        return {}
+    reference = _style_reference_from_design_brief(brief, style_preset)
+    playbook = reference.get("layout_playbook") if isinstance(reference.get("layout_playbook"), dict) else {}
+    if playbook.get("playbook_version") != LAYOUT_PLAYBOOK_VERSION:
+        return {}
+    motif = (
+        reference.get("structural_motif_library")
+        if isinstance(reference.get("structural_motif_library"), dict)
+        else {}
+    )
+
+    applied: list[dict[str, Any]] = []
+    annotated: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    avoid = {
+        str(item).strip().lower()
+        for item in playbook.get("avoid_variants", [])
+        if str(item or "").strip()
+    } if isinstance(playbook.get("avoid_variants"), list) else set()
+
+    for slide_index, slide in enumerate(slides, start=1):
+        if not isinstance(slide, dict):
+            continue
+        slide_type = str(slide.get("type") or "content").strip().lower()
+        if slide_type not in {"content", "text"}:
+            continue
+        treatment_key = _slide_treatment_key(slide)
+        if not treatment_key:
+            continue
+        resolved_variant = _resolve_playbook_variant(slide, playbook, treatment_key)
+        slide_id = str(slide.get("slide_id") or slide.get("id") or slide.get("slug") or f"s{slide_index}")
+        source_variant = str(slide.get("variant") or "").strip().lower()
+        if not resolved_variant:
+            skipped.append(
+                {
+                    "slide_id": slide_id,
+                    "slide_index": slide_index,
+                    "title": str(slide.get("title") or ""),
+                    "treatment_key": treatment_key,
+                    "source_variant": source_variant or "missing",
+                    "reason": "no_compatible_playbook_variant",
+                }
+            )
+            continue
+
+        should_apply = source_variant in _GENERIC_LAYOUT_VARIANTS and resolved_variant != source_variant
+        if should_apply:
+            slide["variant"] = resolved_variant
+
+        recipe_trace = _content_recipe_trace_for_treatment(reference, treatment_key)
+        authored_variant_source = str(slide.get("variant_source") or "").strip()
+        variant_source = authored_variant_source or (
+            "style-reference-playbook" if should_apply else "author-explicit"
+        )
+        existing = slide.get("resolved_treatments")
+        resolved_treatments = dict(existing) if isinstance(existing, dict) else {}
+        style_reference_layout = {
+            "playbook_version": LAYOUT_PLAYBOOK_VERSION,
+            "reference_id": reference.get("reference_id"),
+            "motif_library_version": motif.get("motif_library_version"),
+            "motif_signature": motif.get("motif_signature"),
+            "background_structure": motif.get("background_structure"),
+            "layout_motifs": motif.get("layout_motifs") if isinstance(motif.get("layout_motifs"), list) else [],
+            "treatment_key": treatment_key,
+            "source_variant": source_variant or "missing",
+            "resolved_variant": resolved_variant,
+            "variant_source": variant_source,
+        }
+        style_reference_layout.update(recipe_trace)
+        resolved_treatments["style_reference_layout"] = style_reference_layout
+        slide["resolved_treatments"] = resolved_treatments
+        record = {
+            "slide_id": slide_id,
+            "slide_index": slide_index,
+            "title": str(slide.get("title") or ""),
+            "treatment_key": treatment_key,
+            "source_variant": source_variant or "missing",
+            "resolved_variant": resolved_variant,
+            "applied": should_apply,
+        }
+        if recipe_trace:
+            record["content_recipe_library_version"] = recipe_trace.get("content_recipe_library_version")
+            record["content_recipe_signature"] = recipe_trace.get("content_recipe_signature")
+            record["treatment_archetype_id"] = recipe_trace.get("treatment_archetype_id")
+            record["treatment_archetype_signature"] = recipe_trace.get("treatment_archetype_signature")
+            record["treatment_archetype_semantic_signature"] = recipe_trace.get(
+                "treatment_archetype_semantic_signature"
+            )
+        if source_variant in avoid and not should_apply:
+            record["avoid_variant_warning"] = True
+        annotated.append(record)
+        if should_apply:
+            applied.append(record)
+
+    if not annotated and not skipped:
+        return {}
+    archetype_semantic_signatures = {
+        str(record.get("treatment_key")): str(record.get("treatment_archetype_semantic_signature") or "")
+        for record in annotated
+        if str(record.get("treatment_key") or "").strip()
+        and str(record.get("treatment_archetype_semantic_signature") or "").strip()
+    }
+    return {
+        "playbook_version": LAYOUT_PLAYBOOK_VERSION,
+        "style_preset": style_preset,
+        "reference_id": reference.get("reference_id"),
+        "reference_name": reference.get("reference_name"),
+        "motif_library_version": motif.get("motif_library_version"),
+        "motif_signature": motif.get("motif_signature"),
+        "background_structure": motif.get("background_structure"),
+        "layout_motifs": motif.get("layout_motifs") if isinstance(motif.get("layout_motifs"), list) else [],
+        "preferred_variants": playbook.get("preferred_variants"),
+        "treatment_archetype_semantic_signatures": archetype_semantic_signatures,
+        "applied_count": len(applied),
+        "annotated_count": len(annotated),
+        "skipped_count": len(skipped),
+        "variant_by_slide": annotated,
+        "skipped_slides": skipped[:12],
+    }
+
+
 def _resolved_outline_path(
     *,
     workspace: Path,
     outline_path: Path,
     design_brief_path: Path,
     build_dir: Path,
+    resolved_style_preset: str,
 ) -> Path:
     if not design_brief_path.exists():
         return outline_path
@@ -1779,16 +2190,23 @@ def _resolved_outline_path(
     if not isinstance(outline, dict):
         return outline_path
     brief_style = _deck_style_from_design_brief(brief)
-    if not brief_style:
-        return outline_path
     outline_style = outline.get("deck_style") if isinstance(outline.get("deck_style"), dict) else {}
     resolved_style = {**brief_style, **outline_style}
     resolved_outline = copy.deepcopy(outline)
-    resolved_outline["deck_style"] = resolved_style
+    if resolved_style:
+        resolved_outline["deck_style"] = resolved_style
+    layout_summary = _apply_style_reference_layout_playbook(
+        resolved_outline,
+        brief,
+        style_preset=resolved_style_preset,
+    )
     treatment_summary = _annotate_resolved_slide_treatments(resolved_outline, resolved_style)
-    if treatment_summary:
-        resolved_outline["resolved_treatment_summary"] = treatment_summary
-    if resolved_style == outline_style and not treatment_summary:
+    if treatment_summary or layout_summary:
+        resolved_outline["resolved_treatment_summary"] = {
+            **treatment_summary,
+            **({"style_reference_layout": layout_summary} if layout_summary else {}),
+        }
+    if resolved_style == outline_style and not treatment_summary and not layout_summary:
         return outline_path
     out_path = build_dir / "outline_resolved.json"
     _write_json_if_changed(out_path, resolved_outline)
@@ -2170,6 +2588,7 @@ def main() -> int:
             outline_path=outline_path,
             design_brief_path=design_brief_path,
             build_dir=build_dir,
+            resolved_style_preset=resolved_style_preset,
         )
     except ValueError as exc:
         print(f"[build_workspace] {exc}", file=sys.stderr)

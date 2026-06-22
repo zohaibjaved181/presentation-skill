@@ -18,12 +18,20 @@ reports.
 Workspace builds record the resulting per-slide `resolved_treatments` and
 `resolved_treatment_summary` in `build/outline_resolved.json`, and readiness
 Markdown summarizes the selected header-variant counts before render.
+When a slide uses `treatment_key`, build-time style-reference resolution also
+records `resolved_treatments.style_reference_layout` with the selected
+reference ID, treatment key, source/resolved variant, content-recipe library
+version, and content-recipe signature.
 The same `header_mode: "lab-clean"` report chrome can be layered over other
 presets when a deck needs a boardroom, editorial, research, or journal palette
 but still wants restrained heading/accent-rule rhythm.
 Chart slides can use `deck_style.chart_treatment` or slide-level
-`chart_treatment` to choose `standard`, `facts-below`, `facts-right`, or
-`minimal` chart compositions while keeping chart JSON and captions editable.
+`chart_treatment` to choose `standard`, `facts-below`, `facts-right`,
+`minimal`, `hero-stat`, `threshold-band`, or `sparse-wide` chart compositions
+while keeping chart JSON and captions editable.
+Editable table slides can use `deck_style.table_treatment` or slide-level
+`table_treatment` to choose `standard`, `compact-ledger`,
+`readout-sidecar`, `decision-matrix`, or `journal-grid` table compositions.
 `footer_mode: source-line` reserves a compact provenance line for `sources`,
 `refs`/`references`, and the page number.
 The builder validates enum-like `deck_style` and slide-level treatment values
@@ -56,7 +64,7 @@ silently falling back to the default renderer treatment.
 | `content / matrix`             | `renderMatrix`    | 2x2 quadrant grid.                                        |
 | `content / flow`               | `renderFlow`      | Mermaid/diagram image as the body.                        |
 | `content / chart`              | `renderChart`     | Native editable bar/line/pie chart from inline or staged chart JSON. |
-| `content / scientific-figure`  | `renderScientificFigure` | Multi-panel academic figure slide with labels/captions. |
+| `content / scientific-figure`  | `renderScientificFigure` | Editable figure slide with `panel-grid`, `primary-rail`, `ledger-rail`, or `strip-readout` layouts. |
 | `content / generated-image`    | `renderGeneratedImage` | Standalone generated visual with metadata.           |
 
 Use the Python renderer only for legacy or python-pptx-specific chart behavior

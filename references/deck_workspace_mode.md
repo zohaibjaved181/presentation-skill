@@ -13,6 +13,15 @@ Inline heredoc scripts and ad hoc JSON files are fine for a single pass, but the
 - one command that rebuilds the same deck later
 
 `init_deck_workspace.py` and `build_workspace.py` provide that layer.
+Fresh workspaces start from `style_reference_starter_outline_v1`: a stable
+title/core-message scaffold plus a few synthetic, preset-specific reference
+slides marked `starter_kind: style_reference`. Those slides demonstrate the
+selected preset's chart/table/comparison/dashboard grammar plus its density,
+whitespace, object-count, and source-burden metrics, and must be replaced with
+topic-specific sourced content before final delivery. When a starter uses
+figure/sidebar/flow/card/matrix grammar, init writes deterministic placeholder
+assets under `assets/style_reference/` and `assets/icons/`; keep them only as
+style scaffolds, not factual evidence.
 
 ## Files In A Workspace
 

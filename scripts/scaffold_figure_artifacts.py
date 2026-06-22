@@ -1738,6 +1738,7 @@ def _artifact_alias_plan(specs: list[dict[str, Any]], script_rel: str) -> list[d
         source_label = str(spec.get("source_label") or source_path)
         selected_columns = list(spec.get("selected_columns") or [])
         common_sources = [source_path, script_rel]
+        figure_caption = f"Generated figure from {source_label}."
         artifact_bindings = [
             {
                 "artifact_id": f"{chart_id}_figure",
@@ -1780,6 +1781,26 @@ def _artifact_alias_plan(specs: list[dict[str, Any]], script_rel: str) -> list[d
                 },
             },
             {
+                "variant": "scientific-figure",
+                "best_for": "figure-first report layout with compact caption and panel label",
+                "fields": {
+                    "variant": "scientific-figure",
+                    "slide_intent": "evidence",
+                    "visual_intent": "figure",
+                    "figures": [
+                        {
+                            "path": image_alias,
+                            "label": "A",
+                            "caption": figure_caption,
+                        }
+                    ],
+                    "caption": f"Generated from {source_label} by {script_rel}.",
+                    "sources": common_sources,
+                    "evidence_needs": [chart_id],
+                    "required_artifact_ids": [f"{chart_id}_figure"],
+                },
+            },
+            {
                 "variant": "chart",
                 "best_for": "editable native chart when the audience may revise labels or values in PowerPoint",
                 "fields": {
@@ -1800,6 +1821,19 @@ def _artifact_alias_plan(specs: list[dict[str, Any]], script_rel: str) -> list[d
                     "slide_intent": "evidence",
                     "visual_intent": "table",
                     "tables": [table_alias],
+                    "sources": [spec["table_json"], source_path],
+                    "evidence_needs": [chart_id],
+                    "required_artifact_ids": [f"{chart_id}_summary_table"],
+                },
+            },
+            {
+                "variant": "table",
+                "best_for": "single editable table when the preset prefers boardroom or decision-table treatment",
+                "fields": {
+                    "variant": "table",
+                    "slide_intent": "evidence",
+                    "visual_intent": "table",
+                    "table_data": table_alias,
                     "sources": [spec["table_json"], source_path],
                     "evidence_needs": [chart_id],
                     "required_artifact_ids": [f"{chart_id}_summary_table"],

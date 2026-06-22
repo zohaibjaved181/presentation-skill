@@ -362,11 +362,33 @@ def _assert_required_packet(packet: dict[str, Any], failures: list[dict[str, Any
         if isinstance(preset_profile.get("style_mix_matrix"), dict)
         else {}
     )
+    style_reference = (
+        preset_profile.get("style_reference")
+        if isinstance(preset_profile.get("style_reference"), dict)
+        else {}
+    )
+    content_treatments = (
+        style_reference.get("content_treatments")
+        if isinstance(style_reference.get("content_treatments"), dict)
+        else {}
+    )
+    layout_playbook = (
+        style_reference.get("layout_playbook")
+        if isinstance(style_reference.get("layout_playbook"), dict)
+        else {}
+    )
     if (
         preset_profile.get("profile_version") != "deck_preset_treatment_profiles_v1"
         or preset_profile.get("style_preset") != "lab-report"
         or "top-bottom-rule" not in profile_mix.get("header_variant_pool", [])
         or "source-line" not in profile_mix.get("footer_pool", [])
+        or style_reference.get("catalog_version") != "style_reference_catalog_v1"
+        or style_reference.get("source_status") != "synthetic_original_publish_safe"
+        or layout_playbook.get("playbook_version") != "style_reference_layout_playbook_v1"
+        or "lab-run-results" not in layout_playbook.get("preferred_variants", [])
+        or not content_treatments.get("figure")
+        or not content_treatments.get("table")
+        or not content_treatments.get("decision")
     ):
         failures.append(
             {
@@ -376,7 +398,7 @@ def _assert_required_packet(packet: dict[str, Any], failures: list[dict[str, Any
             }
         )
     locked_fields = kickoff.get("locked_replay_fields") if isinstance(kickoff.get("locked_replay_fields"), list) else []
-    for required_field in ("style_system.style_mix_matrix", "slide_quality_contract", "readability_contract", "analysis_artifact_plan"):
+    for required_field in ("style_system.style_mix_matrix", "style_system.style_reference", "slide_quality_contract", "readability_contract", "analysis_artifact_plan"):
         if required_field not in locked_fields:
             failures.append({"step": "deck_start_packet", "reason": "kickoff_missing_locked_field", "field": required_field})
     command_ladder = kickoff.get("command_ladder") if isinstance(kickoff.get("command_ladder"), dict) else {}
@@ -510,6 +532,147 @@ def _assert_pre_intake_readiness(
             )
 
 
+def _assert_style_reference_starter_workspace(workspace: Path, failures: list[dict[str, Any]]) -> None:
+    outline = _load_json(workspace / "outline.json")
+    content = _load_json(workspace / "content_plan.json")
+    design = _load_json(workspace / "design_brief.json")
+    style_contract = _load_json(workspace / "style_contract.json")
+    notes = (workspace / "notes.md").read_text(encoding="utf-8") if (workspace / "notes.md").exists() else ""
+
+    if not isinstance(outline, dict):
+        failures.append({"step": "init_deck_workspace", "reason": "outline_not_object"})
+        return
+    metadata = outline.get("metadata") if isinstance(outline.get("metadata"), dict) else {}
+    style_meta = metadata.get("style_reference") if isinstance(metadata.get("style_reference"), dict) else {}
+    if (
+        metadata.get("starter_outline_version") != "style_reference_starter_outline_v1"
+        or metadata.get("starter_outline_status") != "synthetic_scaffold_replace_before_delivery"
+        or style_meta.get("reference_id") != "ref-clean-assay-report"
+        or style_meta.get("playbook_version") != "style_reference_layout_playbook_v1"
+    ):
+        failures.append(
+            {
+                "step": "init_deck_workspace",
+                "reason": "style_reference_starter_metadata_missing",
+                "metadata": metadata,
+            }
+        )
+
+    slides = outline.get("slides") if isinstance(outline.get("slides"), list) else []
+    scaffold_slides = [
+        slide
+        for slide in slides
+        if isinstance(slide, dict) and slide.get("starter_kind") == "style_reference"
+    ]
+    scaffold_variants = {
+        str(slide.get("variant") or "").strip()
+        for slide in scaffold_slides
+        if str(slide.get("variant") or "").strip()
+    }
+    expected_variants = {"lab-run-results", "scientific-figure", "comparison-2col"}
+    if len(scaffold_slides) < 3 or not expected_variants.issubset(scaffold_variants):
+        failures.append(
+            {
+                "step": "init_deck_workspace",
+                "reason": "style_reference_starter_variants_missing",
+                "variants": sorted(scaffold_variants),
+                "slide_count": len(scaffold_slides),
+            }
+        )
+    if any(not slide.get("sources") or not slide.get("refs") for slide in scaffold_slides):
+        failures.append(
+            {
+                "step": "init_deck_workspace",
+                "reason": "style_reference_starter_sources_missing",
+                "slides": scaffold_slides,
+            }
+        )
+
+    slide_plan = content.get("slide_plan") if isinstance(content, dict) and isinstance(content.get("slide_plan"), list) else []
+    plan_by_id = {
+        str(item.get("slide_id") or "").strip(): item
+        for item in slide_plan
+        if isinstance(item, dict) and str(item.get("slide_id") or "").strip()
+    }
+    outline_ids = [
+        str(slide.get("slide_id") or "").strip()
+        for slide in slides
+        if isinstance(slide, dict) and str(slide.get("slide_id") or "").strip()
+    ]
+    if sorted(plan_by_id) != sorted(outline_ids):
+        failures.append(
+            {
+                "step": "content_plan",
+                "reason": "starter_slide_plan_not_complete",
+                "outline_ids": outline_ids,
+                "plan_ids": sorted(plan_by_id),
+            }
+        )
+    for slide in scaffold_slides:
+        slide_id = str(slide.get("slide_id") or "").strip()
+        plan = plan_by_id.get(slide_id, {})
+        evidence_needs = plan.get("evidence_needs") if isinstance(plan.get("evidence_needs"), list) else []
+        if (
+            plan.get("source_status") != "synthetic_style_reference_scaffold"
+            or "replace_synthetic_style_reference_content" not in evidence_needs
+        ):
+            failures.append(
+                {
+                    "step": "content_plan",
+                    "reason": "style_reference_scaffold_not_flagged",
+                    "slide_id": slide_id,
+                    "plan": plan,
+                }
+            )
+
+    style_system = design.get("style_system") if isinstance(design, dict) and isinstance(design.get("style_system"), dict) else {}
+    direct_reference = (
+        style_system.get("style_reference")
+        if isinstance(style_system.get("style_reference"), dict)
+        else {}
+    )
+    structure = design.get("structure_strategy") if isinstance(design, dict) and isinstance(design.get("structure_strategy"), dict) else {}
+    structure_playbook = (
+        structure.get("style_reference_layout_playbook")
+        if isinstance(structure.get("style_reference_layout_playbook"), dict)
+        else {}
+    )
+    if (
+        direct_reference.get("catalog_version") != "style_reference_catalog_v1"
+        or direct_reference.get("reference_id") != "ref-clean-assay-report"
+        or direct_reference.get("source_status") != "synthetic_original_publish_safe"
+        or not isinstance(direct_reference.get("example_storyboard"), dict)
+        or structure_playbook.get("playbook_version") != "style_reference_layout_playbook_v1"
+    ):
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "style_reference_starter_design_context_missing",
+                "style_reference": direct_reference,
+                "structure_playbook": structure_playbook,
+            }
+        )
+
+    contract_reference = (
+        style_contract.get("style_reference")
+        if isinstance(style_contract, dict) and isinstance(style_contract.get("style_reference"), dict)
+        else {}
+    )
+    if (
+        contract_reference.get("reference_id") != "ref-clean-assay-report"
+        or contract_reference.get("starter_outline_version") != "style_reference_starter_outline_v1"
+    ):
+        failures.append(
+            {
+                "step": "style_contract",
+                "reason": "style_reference_starter_contract_missing",
+                "style_reference": contract_reference,
+            }
+        )
+    if "Starter scaffold: `style_reference_starter_outline_v1`" not in notes:
+        failures.append({"step": "notes", "reason": "style_reference_starter_notes_missing"})
+
+
 def _assert_application_state(
     *,
     workspace: Path,
@@ -533,6 +696,11 @@ def _assert_application_state(
     preset_profile = (
         style_system.get("preset_treatment_profile")
         if isinstance(style_system.get("preset_treatment_profile"), dict)
+        else {}
+    )
+    direct_style_reference = (
+        style_system.get("style_reference")
+        if isinstance(style_system.get("style_reference"), dict)
         else {}
     )
     user_intake = design.get("user_intake") if isinstance(design.get("user_intake"), dict) else {}
@@ -572,12 +740,29 @@ def _assert_application_state(
     if (
         preset_profile.get("profile_version") != "deck_preset_treatment_profiles_v1"
         or preset_profile.get("style_preset") != "lab-report"
+        or not isinstance(preset_profile.get("style_reference"), dict)
+        or preset_profile["style_reference"].get("catalog_version") != "style_reference_catalog_v1"
+        or not isinstance(preset_profile["style_reference"].get("layout_playbook"), dict)
+        or preset_profile["style_reference"]["layout_playbook"].get("playbook_version") != "style_reference_layout_playbook_v1"
     ):
         failures.append(
             {
                 "step": "design_brief",
                 "reason": "preset_treatment_profile_not_preserved",
                 "preset_treatment_profile": preset_profile,
+            }
+        )
+    if (
+        direct_style_reference.get("catalog_version") != "style_reference_catalog_v1"
+        or direct_style_reference.get("reference_id") != "ref-clean-assay-report"
+        or not isinstance(direct_style_reference.get("layout_playbook"), dict)
+        or direct_style_reference["layout_playbook"].get("playbook_version") != "style_reference_layout_playbook_v1"
+    ):
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "direct_style_reference_not_preserved",
+                "style_reference": direct_style_reference,
             }
         )
     if user_intake.get("answered_by") != "best_judgment":
@@ -827,6 +1012,7 @@ def main() -> int:
                     "stdout_tail": init_stdout,
                 }
             )
+        _assert_style_reference_starter_workspace(workspace, failures)
         pre_intake_readiness_cmd = [
             py,
             str(repo / "scripts" / "report_workspace_readiness.py"),

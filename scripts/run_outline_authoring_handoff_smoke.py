@@ -235,6 +235,7 @@ def _outline_handoff(*, workspace: Path, seed: str) -> dict[str, Any]:
         "contract_alignment": {
             "style_seed": seed,
             "style_preset": "lab-report",
+            "style_reference_id": "ref-clean-assay-report",
             "header_footer_plan": (
                 "Use lab-clean auto header variants and source-line footer/page "
                 "numbers from the contract."
@@ -242,6 +243,82 @@ def _outline_handoff(*, workspace: Path, seed: str) -> dict[str, Any]:
             "variant_mix_plan": (
                 "Use title, lab-run-results, and comparison-2col without random cycling."
             ),
+            "structural_motif_library_used": {
+                "motif_library_version": "style_reference_structural_motif_library_v1",
+                "background_structure": "source-first lab report with run metadata plate, table/figure evidence, and traceable refs",
+                "layout_motifs_used": ["run metadata plate", "semantic result table", "refs footer"],
+                "content_object_rules_used": [
+                    "bind sample/run/method metadata to structured title, caption, or table fields",
+                    "prefer lab-run-results and scientific-figure variants before generic prose",
+                ],
+                "motif_signature": "lab-report-smoke-structural-motif",
+            },
+            "style_metric_profile_used": {
+                "metric_profile_version": "style_reference_metric_profile_v1",
+                "metric_signature": "lab-report-smoke-style-metric",
+                "density_level": "high clean lab report",
+                "whitespace_ratio_target": 0.19,
+                "body_words_per_content_slide": [36, 62],
+                "max_primary_objects": 4,
+                "visual_hierarchy": "run metadata, result table, figure panel, and refs stay traceable",
+                "evidence_object_mix": {"chart": 0.22, "table": 0.34, "figure": 0.36, "prose": 0.08},
+            },
+            "layout_playbook_used": {
+                "playbook_version": "style_reference_layout_playbook_v1",
+                "preferred_variants": ["title", "lab-run-results", "scientific-figure", "comparison-2col", "chart", "table"],
+                "treatment_archetypes_used": {
+                    "title": "lab-run-metadata-plate-opener: run/sample/method metadata plate",
+                    "comparison": "clean-assay-report-comparison-frame: raw screen vs report-ready readout",
+                    "chart": "clean-assay-report-chart-readout: minimal scientific chart with readout",
+                    "table": "clean-assay-report-table-ledger: semantic lab-run result table",
+                    "figure": "clean-assay-report-figure-proof-object: scientific panel proof object",
+                    "dashboard": "clean-assay-report-dashboard-state-board: run state dashboard",
+                    "decision": "clean-assay-report-decision-record: accept/repeat/escalate decision record",
+                    "references": "lab-source-id-refs-table: source IDs plus editable references table",
+                },
+                "treatment_archetype_semantic_signatures_used": {
+                    "title": "semantic-title-lab-run-metadata-plate",
+                    "comparison": "semantic-comparison-clean-assay-report",
+                    "chart": "semantic-chart-clean-assay-report",
+                    "table": "semantic-table-clean-assay-report",
+                    "figure": "semantic-figure-clean-assay-report",
+                    "dashboard": "semantic-dashboard-clean-assay-report",
+                    "decision": "semantic-decision-clean-assay-report",
+                    "references": "semantic-references-lab-source-id-refs-table",
+                },
+                "treatment_variant_map_used": {
+                    "title": "title",
+                    "dashboard": "lab-run-results",
+                    "table": "lab-run-results",
+                    "comparison": "comparison-2col",
+                },
+                "content_rules_used": [
+                    "Prefer lab-run-results and scientific-figure before generic prose.",
+                ],
+            },
+            "content_recipe_library_used": {
+                "library_version": "style_reference_content_recipe_library_v1",
+                "recipe_signatures_used": {
+                    "table": "table::Lab-run-results fixture",
+                    "comparison": "comparison::Fixture contrast",
+                },
+                "slide_recipe_map": [
+                    {
+                        "slide_id": "s2",
+                        "treatment_key": "table",
+                        "recipe_signature": "table::Lab-run-results fixture",
+                        "required_slots_filled": ["row entity", "status/signal field", "action/owner field"],
+                        "data_roles_bound": ["entity", "metric/state", "owner/action"],
+                    },
+                    {
+                        "slide_id": "s3",
+                        "treatment_key": "comparison",
+                        "recipe_signature": "comparison::Fixture contrast",
+                        "required_slots_filled": ["left state", "right state", "verdict"],
+                        "data_roles_bound": ["baseline", "target/comparator", "decision rule"],
+                    },
+                ],
+            },
         },
         "artifact_rebuild_plan": {
             "context_version": "presentation_skill_artifact_rebuild_context_v1",
@@ -506,6 +583,22 @@ def _assert_outline_state(
         failures.append({"step": "notes", "reason": "artifact_rebuild_plan_notes_missing"})
     if "### Quality Alignment" not in notes or "slide_quality_contract_v1" not in notes:
         failures.append({"step": "notes", "reason": "quality_alignment_notes_missing"})
+    if "Style reference: `ref-clean-assay-report`" not in notes or "style_reference_layout_playbook_v1" not in notes:
+        failures.append({"step": "notes", "reason": "style_reference_playbook_notes_missing"})
+    if "Title archetype used:" not in notes or "lab-run-metadata-plate-opener" not in notes:
+        failures.append({"step": "notes", "reason": "title_archetype_notes_missing"})
+    if "References archetype used:" not in notes or "lab-source-id-refs-table" not in notes:
+        failures.append({"step": "notes", "reason": "references_archetype_notes_missing"})
+    if "Body treatment archetypes used:" not in notes or "clean-assay-report-table-ledger" not in notes:
+        failures.append({"step": "notes", "reason": "body_archetype_notes_missing"})
+    if "Treatment semantic signatures used:" not in notes or "semantic-table" not in notes:
+        failures.append({"step": "notes", "reason": "semantic_archetype_notes_missing"})
+    if "style_reference_structural_motif_library_v1" not in notes or "semantic result table" not in notes:
+        failures.append({"step": "notes", "reason": "style_reference_motif_notes_missing"})
+    if "style_reference_metric_profile_v1" not in notes or "high clean lab report" not in notes:
+        failures.append({"step": "notes", "reason": "style_metric_profile_notes_missing"})
+    if "style_reference_content_recipe_library_v1" not in notes or "s2:table" not in notes:
+        failures.append({"step": "notes", "reason": "content_recipe_library_notes_missing"})
 
     outline_meta = design.get("outline_authoring_handoff") if isinstance(design.get("outline_authoring_handoff"), dict) else {}
     persisted_plan = (
@@ -516,6 +609,11 @@ def _assert_outline_state(
     persisted_quality = (
         outline_meta.get("quality_alignment")
         if isinstance(outline_meta.get("quality_alignment"), dict)
+        else {}
+    )
+    persisted_alignment = (
+        outline_meta.get("contract_alignment")
+        if isinstance(outline_meta.get("contract_alignment"), dict)
         else {}
     )
     analysis_plan = design.get("analysis_artifact_plan") if isinstance(design.get("analysis_artifact_plan"), dict) else {}
@@ -529,6 +627,63 @@ def _assert_outline_state(
         )
     if not isinstance(analysis_plan.get("outline_authoring_rebuild_plan"), dict):
         failures.append({"step": "design_brief", "reason": "missing_analysis_outline_rebuild_plan"})
+    if (
+        persisted_alignment.get("style_reference_id") != "ref-clean-assay-report"
+        or not isinstance(persisted_alignment.get("layout_playbook_used"), dict)
+        or not isinstance(persisted_alignment.get("structural_motif_library_used"), dict)
+        or persisted_alignment["layout_playbook_used"].get("playbook_version") != "style_reference_layout_playbook_v1"
+        or persisted_alignment["structural_motif_library_used"].get("motif_library_version") != "style_reference_structural_motif_library_v1"
+    ):
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "missing_outline_style_reference_alignment",
+                "contract_alignment": persisted_alignment,
+            }
+        )
+    persisted_playbook = (
+        persisted_alignment.get("layout_playbook_used")
+        if isinstance(persisted_alignment.get("layout_playbook_used"), dict)
+        else {}
+    )
+    persisted_semantic = (
+        persisted_playbook.get("treatment_archetype_semantic_signatures_used")
+        if isinstance(persisted_playbook.get("treatment_archetype_semantic_signatures_used"), dict)
+        else {}
+    )
+    if set(persisted_semantic) != {
+        "title",
+        "comparison",
+        "chart",
+        "table",
+        "figure",
+        "dashboard",
+        "decision",
+        "references",
+    }:
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "missing_outline_semantic_archetype_alignment",
+                "contract_alignment": persisted_alignment,
+            }
+        )
+    persisted_recipes = (
+        persisted_alignment.get("content_recipe_library_used")
+        if isinstance(persisted_alignment.get("content_recipe_library_used"), dict)
+        else {}
+    )
+    if (
+        persisted_recipes.get("library_version") != "style_reference_content_recipe_library_v1"
+        or len(persisted_recipes.get("slide_recipe_map") if isinstance(persisted_recipes.get("slide_recipe_map"), list) else []) < 2
+    ):
+        failures.append(
+            {
+                "step": "design_brief",
+                "reason": "missing_outline_content_recipe_alignment",
+                "contract_alignment": persisted_alignment,
+            }
+        )
     if (
         persisted_quality.get("contract_version") != "slide_quality_contract_v1"
         or "min_title_pt=24" not in persisted_quality.get("readability_targets_used", [])
@@ -798,6 +953,38 @@ def main() -> int:
             or '"quality_alignment"' not in prompt_text
         ):
             failures.append({"step": "emit_outline_authoring_prompt", "reason": "prompt_missing_quality_alignment"})
+        if (
+            "Style reference layout playbook:" not in prompt_text
+            or "style_reference_layout_playbook_v1" not in prompt_text
+            or "layout_playbook_used" not in prompt_text
+            or "treatment_archetypes" not in prompt_text
+            or "treatment_archetypes_used" not in prompt_text
+            or "semantic_signature" not in prompt_text
+            or "treatment_archetype_semantic_signatures_used" not in prompt_text
+            or "clean-assay-report-table-ledger" not in prompt_text
+        ):
+            failures.append({"step": "emit_outline_authoring_prompt", "reason": "prompt_missing_style_reference_layout_playbook"})
+        if (
+            "content_recipe_library" not in prompt_text
+            or "style_reference_content_recipe_library_v1" not in prompt_text
+            or "slide_recipe_map" not in prompt_text
+        ):
+            failures.append({"step": "emit_outline_authoring_prompt", "reason": "prompt_missing_content_recipe_library"})
+        if (
+            "structural_motif_library" not in prompt_text
+            or "style_reference_structural_motif_library_v1" not in prompt_text
+            or "run metadata plate" not in prompt_text
+        ):
+            failures.append({"step": "emit_outline_authoring_prompt", "reason": "prompt_missing_structural_motif_library"})
+        if (
+            "style_metric_profile" not in prompt_text
+            or "style_reference_metric_profile_v1" not in prompt_text
+            or "body_words_per_content_slide" not in prompt_text
+            or "evidence_object_mix" not in prompt_text
+        ):
+            failures.append({"step": "emit_outline_authoring_prompt", "reason": "prompt_missing_style_metric_profile"})
+        if "style_source_intake" not in prompt_text or "generic_slide_patterns" not in prompt_text:
+            failures.append({"step": "emit_outline_authoring_prompt", "reason": "prompt_missing_style_source_intake"})
 
         _write_json(handoff_path, _outline_handoff(workspace=workspace, seed=seed))
         for cmd in (
@@ -952,6 +1139,19 @@ def main() -> int:
             "style_seed": seed,
             "prompt_contains_handoff_shape": "outline_authoring_handoff_v1" in prompt_text,
             "prompt_contains_quality_alignment": "slide_quality_contract_v1" in prompt_text and '"quality_alignment"' in prompt_text,
+            "prompt_contains_content_recipe_library": "style_reference_content_recipe_library_v1" in prompt_text
+            and "content_recipe_library" in prompt_text
+            and "slide_recipe_map" in prompt_text,
+            "prompt_contains_structural_motif_library": "style_reference_structural_motif_library_v1" in prompt_text
+            and "structural_motif_library" in prompt_text,
+            "prompt_contains_style_metric_profile": "style_reference_metric_profile_v1" in prompt_text
+            and "style_metric_profile" in prompt_text
+            and "body_words_per_content_slide" in prompt_text,
+            "prompt_contains_treatment_archetypes": "treatment_archetypes" in prompt_text
+            and "treatment_archetypes_used" in prompt_text
+            and "clean-assay-report-table-ledger" in prompt_text,
+            "prompt_contains_style_source_intake": "style_source_intake" in prompt_text
+            and "generic_slide_patterns" in prompt_text,
             "apply_changed_file_count": apply_report.get("changed_file_count") if isinstance(apply_report, dict) else None,
             "repeat_changed_file_count": repeat_report.get("changed_file_count") if isinstance(repeat_report, dict) else None,
             "quality_alignment_applied": apply_report.get("quality_alignment_applied") if isinstance(apply_report, dict) else None,
@@ -991,6 +1191,8 @@ def main() -> int:
                         "style_seed",
                         "prompt_contains_handoff_shape",
                         "prompt_contains_quality_alignment",
+                        "prompt_contains_content_recipe_library",
+                        "prompt_contains_treatment_archetypes",
                         "apply_changed_file_count",
                         "repeat_changed_file_count",
                         "quality_alignment_applied",

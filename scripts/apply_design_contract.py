@@ -16,7 +16,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from style_treatment_profiles import preset_treatment_profile
+from style_reference_catalog import preset_style_reference
+from style_treatment_profiles import (
+    RENDERER_TREATMENT_FIELDS,
+    preset_treatment_profile,
+    renderer_treatment_defaults_from_mix,
+    renderer_treatment_summary,
+)
 
 
 NOTE_START = "<!-- deck-design-contract:start -->"
@@ -74,6 +80,21 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+def _semantic_archetype_signature(item: dict[str, Any]) -> str:
+    material = {
+        "structure": item.get("structure"),
+        "object_pattern": item.get("object_pattern"),
+        "required_fields": item.get("required_fields") if isinstance(item.get("required_fields"), list) else [],
+        "primary_variants": item.get("primary_variants") if isinstance(item.get("primary_variants"), list) else [],
+        "title_layout": item.get("title_layout"),
+        "footer_mode": item.get("footer_mode"),
+        "content_goal": item.get("content_goal"),
+    }
+    return hashlib.sha256(
+        json.dumps(material, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
 
 
 def _text(value: Any) -> str:
@@ -202,27 +223,99 @@ def _source_policy_from(contract: dict[str, Any]) -> str:
     return footer_rule or (policies[0] if policies else "")
 
 
+def _renderer_treatment_base_defaults(style_system: dict[str, Any]) -> dict[str, str]:
+    explicit = _as_dict(style_system.get("renderer_treatment_defaults"))
+    if explicit:
+        return {
+            field: _text(explicit.get(field))
+            for field in RENDERER_TREATMENT_FIELDS
+            if _text(explicit.get(field))
+        }
+    mix = _as_dict(style_system.get("style_mix_matrix"))
+    if mix:
+        return renderer_treatment_defaults_from_mix(
+            _text(style_system.get("style_preset")) or "executive-clinical",
+            mix,
+        )
+    profile_defaults = _as_dict(
+        _as_dict(style_system.get("preset_treatment_profile")).get("renderer_treatment_defaults")
+    )
+    return {
+        field: _text(profile_defaults.get(field))
+        for field in RENDERER_TREATMENT_FIELDS
+        if _text(profile_defaults.get(field))
+    }
+
+
+def _renderer_treatment_values(style_system: dict[str, Any]) -> dict[str, str]:
+    footer = _as_dict(style_system.get("footer_system"))
+    title = _as_dict(style_system.get("title_slide_system"))
+    figure_table = _as_dict(style_system.get("figure_table_system"))
+    table = _as_dict(style_system.get("table_system"))
+    chart = _as_dict(style_system.get("chart_system"))
+    stats = _as_dict(style_system.get("stats_system"))
+    matrix = _as_dict(style_system.get("matrix_system"))
+    summary = _as_dict(style_system.get("summary_callout_system"))
+    values = {
+        field: _text(value)
+        for field, value in _renderer_treatment_base_defaults(style_system).items()
+        if _text(value)
+    }
+    for field, value in {
+        "title_layout": title.get("title_layout") or style_system.get("title_layout"),
+        "footer_mode": footer.get("footer_mode") or style_system.get("footer_mode"),
+        "chart_treatment": chart.get("chart_treatment") or style_system.get("chart_treatment"),
+        "table_treatment": table.get("table_treatment")
+        or figure_table.get("table_treatment")
+        or style_system.get("table_treatment"),
+        "figure_table_treatment": figure_table.get("figure_table_treatment")
+        or style_system.get("figure_table_treatment"),
+        "stats_mode": stats.get("stats_mode") or style_system.get("stats_mode"),
+        "matrix_mode": matrix.get("matrix_mode") or style_system.get("matrix_mode"),
+        "summary_callout_mode": summary.get("summary_callout_mode")
+        or style_system.get("summary_callout_mode"),
+    }.items():
+        if _text(value):
+            values[field] = _text(value)
+    return {
+        field: _text(values.get(field))
+        for field in RENDERER_TREATMENT_FIELDS
+        if _text(values.get(field))
+    }
+
+
 def _renderer_treatments(style_system: dict[str, Any]) -> dict[str, Any]:
     header = _as_dict(style_system.get("header_system"))
     footer = _as_dict(style_system.get("footer_system"))
     title = _as_dict(style_system.get("title_slide_system"))
     section = _as_dict(style_system.get("section_system"))
-    figure_table = _as_dict(style_system.get("figure_table_system"))
-    chart = _as_dict(style_system.get("chart_system"))
+    values = _renderer_treatment_values(style_system)
+    defaults = _renderer_treatment_base_defaults(style_system)
+    summary = renderer_treatment_summary(values)
+    footer_mode = values.get("footer_mode") or footer.get("footer_mode")
     return {
         "style_preset": style_system.get("style_preset"),
+        "renderer_treatment_fields": list(RENDERER_TREATMENT_FIELDS),
+        "renderer_treatment_defaults": defaults,
+        "renderer_treatment_signature": summary["signature"],
         "header_mode": header.get("header_mode"),
         "header_variant": header.get("header_variant"),
         "header_variants": header.get("header_variants"),
-        "footer_mode": footer.get("footer_mode"),
-        "footer_page_numbers": footer.get("footer_page_numbers"),
+        "footer_mode": footer_mode,
+        "footer_page_numbers": footer.get("footer_page_numbers")
+        if _non_empty(footer.get("footer_page_numbers"))
+        else footer_mode == "source-line",
         "footer_source_label": footer.get("footer_source_label"),
         "footer_refs_label": footer.get("footer_refs_label"),
-        "title_layout": title.get("title_layout"),
+        "title_layout": values.get("title_layout") or title.get("title_layout"),
         "title_motif": title.get("title_motif"),
         "section_motif": section.get("section_motif"),
-        "figure_table_treatment": figure_table.get("figure_table_treatment"),
-        "chart_treatment": chart.get("chart_treatment"),
+        "figure_table_treatment": values.get("figure_table_treatment"),
+        "table_treatment": values.get("table_treatment"),
+        "chart_treatment": values.get("chart_treatment"),
+        "stats_mode": values.get("stats_mode"),
+        "matrix_mode": values.get("matrix_mode"),
+        "summary_callout_mode": values.get("summary_callout_mode"),
     }
 
 
@@ -243,6 +336,7 @@ def _slide_plan_from(sequence: list[Any]) -> list[dict[str, Any]]:
                     or _text(item.get("role"))
                 ),
                 "variant": _text(item.get("variant")),
+                "treatment_key": _text(item.get("treatment_key")),
                 "visual_strategy": _text(item.get("visual_strategy")),
                 "evidence_needs": _as_list(item.get("evidence_needs")),
                 "asset_needs": _as_list(item.get("required_assets")),
@@ -250,6 +344,37 @@ def _slide_plan_from(sequence: list[Any]) -> list[dict[str, Any]]:
             }
         )
     return plan
+
+
+def _narrative_arc_from_slide_plan(slide_plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    buckets: dict[str, list[str]] = {"setup": [], "evidence": [], "implication": []}
+    for idx, item in enumerate(slide_plan):
+        slide_id = _text(item.get("slide_id")) or f"s{idx + 1}"
+        role = _text(item.get("role")).lower()
+        variant = _text(item.get("variant")).lower()
+        if idx == 0 or role in {"title", "setup", "context", "opening"} or variant == "title":
+            buckets["setup"].append(slide_id)
+        elif role in {"decision", "recommendation", "implication", "close", "next-step", "next steps"}:
+            buckets["implication"].append(slide_id)
+        else:
+            buckets["evidence"].append(slide_id)
+    return [
+        {
+            "act": "setup",
+            "purpose": "Frame the deck and establish the audience context.",
+            "slides": buckets["setup"],
+        },
+        {
+            "act": "evidence",
+            "purpose": "Present the main proof, analysis, comparison, or figure sequence.",
+            "slides": buckets["evidence"],
+        },
+        {
+            "act": "implication",
+            "purpose": "Close with the decision, recommendation, or next action.",
+            "slides": buckets["implication"],
+        },
+    ]
 
 
 def _replace_notes_section(existing: str, section: str) -> str:
@@ -289,8 +414,9 @@ def _acceptance_evidence_from(contract: dict[str, Any]) -> list[Any]:
 
 
 def _append_style_mix_notes(lines: list[str], style_system: dict[str, Any]) -> None:
+    reference = _as_dict(style_system.get("style_reference"))
     mix = _as_dict(style_system.get("style_mix_matrix"))
-    if not mix:
+    if not mix and not reference:
         return
     pool_labels = (
         ("header_variant_pool", "Header variants"),
@@ -301,11 +427,59 @@ def _append_style_mix_notes(lines: list[str], style_system: dict[str, Any]) -> N
         ("stats_mode_pool", "Stats modes"),
         ("cards_mode_pool", "Card modes"),
         ("chart_treatment_pool", "Chart treatments"),
+        ("table_treatment_pool", "Table treatments"),
         ("summary_callout_mode_pool", "Summary callouts"),
         ("footer_pool", "Footers"),
         ("figure_table_treatment_pool", "Figure/table treatments"),
     )
     lines.extend(["", "### Style Mix Ledger"])
+    if reference:
+        lines.append(f"- Style reference: `{_text(reference.get('reference_id'))}` / {_text(reference.get('reference_name'))}")
+        style_dna = _text(reference.get("style_dna"))
+        if style_dna:
+            lines.append(f"- Reference DNA: {style_dna}")
+        content_treatments = _as_dict(reference.get("content_treatments"))
+        treatment_keys = [key for key in ("title", "comparison", "chart", "table", "figure", "dashboard", "decision", "references") if _text(content_treatments.get(key))]
+        if treatment_keys:
+            lines.append(f"- Reference treatment coverage: {', '.join(treatment_keys)}")
+        playbook = _as_dict(reference.get("layout_playbook"))
+        if playbook:
+            playbook_version = _text(playbook.get("playbook_version"))
+            preferred = _compact_text_list(playbook.get("preferred_variants"), limit=8)
+            avoid = _compact_text_list(playbook.get("avoid_variants"), limit=6)
+            treatment_archetypes = _as_dict(playbook.get("treatment_archetypes"))
+            if playbook_version:
+                lines.append(f"- Reference layout playbook: `{playbook_version}`")
+            if preferred:
+                lines.append(f"- Preferred variants: {preferred}")
+            title_archetype = _as_dict(treatment_archetypes.get("title"))
+            refs_archetype = _as_dict(treatment_archetypes.get("references"))
+            if title_archetype.get("archetype_id"):
+                lines.append(f"- Title archetype: `{_text(title_archetype.get('archetype_id'))}`")
+            if refs_archetype.get("archetype_id"):
+                lines.append(f"- References archetype: `{_text(refs_archetype.get('archetype_id'))}`")
+            body_archetypes = [
+                f"{key}=`{_text(_as_dict(value).get('archetype_id'))}`"
+                for key, value in treatment_archetypes.items()
+                if key not in {"title", "references"} and _text(_as_dict(value).get("archetype_id"))
+            ]
+            if body_archetypes:
+                lines.append(f"- Body treatment archetypes: {', '.join(body_archetypes)}")
+            if avoid:
+                lines.append(f"- Avoid variants: {avoid}")
+        motif = _as_dict(reference.get("structural_motif_library"))
+        if motif:
+            motif_version = _text(motif.get("motif_library_version"))
+            background = _text(motif.get("background_structure"))
+            motifs = _compact_text_list(motif.get("layout_motifs"), limit=6)
+            if motif_version:
+                lines.append(f"- Structural motif library: `{motif_version}`")
+            if background:
+                lines.append(f"- Background structure: {background}")
+            if motifs:
+                lines.append(f"- Layout motifs: {motifs}")
+    if not mix:
+        return
     mix_rule = _text(mix.get("mix_rule"))
     if mix_rule:
         lines.append(f"- Mix rule: {mix_rule}")
@@ -341,8 +515,12 @@ def _reproducibility_contract_from(
     footer = _as_dict(style_system.get("footer_system"))
     figure_table = _as_dict(style_system.get("figure_table_system"))
     chart = _as_dict(style_system.get("chart_system"))
+    style_reference = _as_dict(style_system.get("style_reference"))
     artifact_plan = _as_dict(evidence.get("analysis_artifact_plan"))
     figure_contract = _as_dict(evidence.get("figure_export_contract"))
+    renderer_defaults = _renderer_treatment_base_defaults(style_system)
+    renderer_values = _renderer_treatment_values(style_system)
+    renderer_signature = renderer_treatment_summary(renderer_values)["signature"]
 
     def fill(key: str, value: Any) -> None:
         if _non_empty(value) and not _non_empty(replay.get(key)):
@@ -355,12 +533,14 @@ def _reproducibility_contract_from(
     fill("style_seed", style_seed)
     fill("choice_source", _text(choice_resolution.get("answered_by")) or "design_contract")
     fill("renderer", "pptxgenjs")
+    fill("renderer_treatment_signature", renderer_signature)
     fill(
         "locked_design_fields",
         [
             "style_system.style_preset",
             "style_system.background_system",
             "style_system.style_mix_matrix",
+            "style_system.renderer_treatment_signature",
             "structure_blueprint.slide_sequence",
             "evidence_and_assets.analysis_artifact_plan",
             "slide_quality_contract",
@@ -382,17 +562,73 @@ def _reproducibility_contract_from(
     if replay_inputs:
         replay["replay_inputs"] = replay_inputs
 
+    structural_motif = _as_dict(style_reference.get("structural_motif_library"))
+    style_metric_profile = _as_dict(style_reference.get("style_metric_profile"))
+    layout_playbook = _as_dict(style_reference.get("layout_playbook"))
+    treatment_archetypes = _as_dict(layout_playbook.get("treatment_archetypes"))
+    title_archetype = _as_dict(treatment_archetypes.get("title"))
+    refs_archetype = _as_dict(treatment_archetypes.get("references"))
+    treatment_archetype_ids = {
+        str(key): _text(_as_dict(value).get("archetype_id"))
+        for key, value in treatment_archetypes.items()
+        if _text(_as_dict(value).get("archetype_id"))
+    }
+    treatment_archetype_signatures = {
+        str(key): _text(_as_dict(value).get("archetype_signature"))
+        for key, value in treatment_archetypes.items()
+        if _text(_as_dict(value).get("archetype_signature"))
+    }
+    treatment_archetype_semantic_signatures = {
+        str(key): _text(_as_dict(value).get("semantic_signature"))
+        or _semantic_archetype_signature(_as_dict(value))
+        for key, value in treatment_archetypes.items()
+        if _text(_as_dict(value).get("archetype_id"))
+    }
     style_replay = dict(_as_dict(replay.get("style_replay")))
     for key, value in {
         "style_preset": style_system.get("style_preset"),
         "palette_key": style_system.get("palette_key"),
         "background_system": style_system.get("background_system"),
         "header_variant": header.get("header_variant"),
-        "footer_mode": footer.get("footer_mode"),
-        "title_layout": title.get("title_layout"),
-        "chart_treatment": chart.get("chart_treatment"),
-        "figure_table_treatment": figure_table.get("figure_table_treatment"),
+        "footer_mode": renderer_values.get("footer_mode") or footer.get("footer_mode"),
+        "title_layout": renderer_values.get("title_layout") or title.get("title_layout"),
+        "chart_treatment": renderer_values.get("chart_treatment") or chart.get("chart_treatment"),
+        "table_treatment": renderer_values.get("table_treatment"),
+        "figure_table_treatment": renderer_values.get("figure_table_treatment")
+        or figure_table.get("figure_table_treatment"),
+        "stats_mode": renderer_values.get("stats_mode"),
+        "matrix_mode": renderer_values.get("matrix_mode"),
+        "summary_callout_mode": renderer_values.get("summary_callout_mode"),
+        "renderer_treatment_fields": list(RENDERER_TREATMENT_FIELDS),
+        "renderer_treatment_defaults": renderer_defaults,
+        "renderer_treatment_signature": renderer_signature,
         "mix_rule": mix.get("mix_rule"),
+        "style_reference_id": style_reference.get("reference_id"),
+        "style_reference_name": style_reference.get("reference_name"),
+        "style_reference_dna": style_reference.get("style_dna"),
+        "structural_motif_library_version": structural_motif.get("motif_library_version"),
+        "structural_motif_signature": structural_motif.get("motif_signature"),
+        "background_structure": structural_motif.get("background_structure"),
+        "layout_motifs": structural_motif.get("layout_motifs"),
+        "style_metric_profile_version": style_metric_profile.get("metric_profile_version"),
+        "style_metric_signature": style_metric_profile.get("metric_signature"),
+        "density_level": style_metric_profile.get("density_level"),
+        "whitespace_ratio_target": style_metric_profile.get("whitespace_ratio_target"),
+        "body_words_per_content_slide": style_metric_profile.get("body_words_per_content_slide"),
+        "max_primary_objects": style_metric_profile.get("max_primary_objects"),
+        "visual_hierarchy": style_metric_profile.get("visual_hierarchy"),
+        "evidence_object_mix": style_metric_profile.get("evidence_object_mix"),
+        "source_burden": style_metric_profile.get("source_burden"),
+        "footer_posture": style_metric_profile.get("footer_posture"),
+        "style_reference_layout_playbook_version": layout_playbook.get("playbook_version"),
+        "style_reference_preferred_variants": layout_playbook.get("preferred_variants"),
+        "title_archetype_id": title_archetype.get("archetype_id"),
+        "title_archetype_signature": title_archetype.get("archetype_signature"),
+        "references_archetype_id": refs_archetype.get("archetype_id"),
+        "references_archetype_signature": refs_archetype.get("archetype_signature"),
+        "treatment_archetype_ids": treatment_archetype_ids,
+        "treatment_archetype_signatures": treatment_archetype_signatures,
+        "treatment_archetype_semantic_signatures": treatment_archetype_semantic_signatures,
     }.items():
         if _non_empty(value) and not _non_empty(style_replay.get(key)):
             style_replay[key] = value
@@ -401,6 +637,7 @@ def _reproducibility_contract_from(
         "title_layout_pool": _first_list(mix.get("title_layout_pool")),
         "footer_pool": _first_list(mix.get("footer_pool")),
         "chart_treatment_pool": _first_list(mix.get("chart_treatment_pool")),
+        "table_treatment_pool": _first_list(mix.get("table_treatment_pool")),
         "figure_table_treatment_pool": _first_list(mix.get("figure_table_treatment_pool")),
     }
     for key, value in pool_sources.items():
@@ -413,9 +650,12 @@ def _reproducibility_contract_from(
         ]
     if style_replay:
         replay["style_replay"] = style_replay
+    if style_reference and not isinstance(replay.get("style_reference"), dict):
+        replay["style_reference"] = style_reference
 
     sequence = _as_list(structure.get("slide_sequence"))
     structure_replay = dict(_as_dict(replay.get("structure_replay")))
+    recipe_library = _as_dict(style_reference.get("content_recipe_library"))
     fill_target = structure.get("target_slide_count") or len(sequence)
     for key, value in {
         "target_slide_count": fill_target,
@@ -424,8 +664,17 @@ def _reproducibility_contract_from(
             for item in sequence
             if isinstance(item, dict) and _text(item.get("variant"))
         ],
+        "content_recipe_library_version": recipe_library.get("library_version"),
+        "content_recipe_signatures": recipe_library.get("recipe_signatures"),
+        "structural_motif_library_version": structural_motif.get("motif_library_version"),
+        "structural_motif_signature": structural_motif.get("motif_signature"),
+        "structural_content_object_rules": structural_motif.get("content_object_rules"),
         "evidence_anchor_rule": "Every evidence/data slide needs a visible chart, table, figure, image, or structured comparison anchor.",
         "white_space_rule": "Choose slide variants that fit the actual evidence shape; do not leave awkward sparse regions.",
+        "style_reference_opening_sequence": layout_playbook.get("opening_sequence"),
+        "style_reference_content_rules": layout_playbook.get("content_rules"),
+        "style_reference_treatment_archetypes": treatment_archetypes,
+        "treatment_archetype_semantic_signatures": treatment_archetype_semantic_signatures,
     }.items():
         if _non_empty(value) and not _non_empty(structure_replay.get(key)):
             structure_replay[key] = value
@@ -568,12 +817,16 @@ def _append_reproducibility_notes(lines: list[str], replay: dict[str, Any]) -> N
             lines.append(f"- {label}: `{text}`")
     style_replay = _as_dict(replay.get("style_replay"))
     if style_replay:
+        signature = _text(style_replay.get("renderer_treatment_signature"))
+        if signature:
+            lines.append(f"- Renderer treatment signature: `{signature}`")
         for key, label in (
             ("style_preset", "Style preset"),
             ("background_system", "Background"),
             ("header_variant_pool", "Header pool"),
             ("footer_pool", "Footer pool"),
             ("chart_treatment_pool", "Chart pool"),
+            ("table_treatment_pool", "Table pool"),
             ("figure_table_treatment_pool", "Figure/table pool"),
         ):
             value = style_replay.get(key)
@@ -762,6 +1015,9 @@ def _append_choice_resolution_notes(lines: list[str], choice_resolution: dict[st
                 choices.append(text)
     if choices:
         lines.append(f"- Resolved choices: {_compact_text_list(choices)}")
+    selected_signature = _text(choice_resolution.get("selected_renderer_treatment_signature"))
+    if selected_signature:
+        lines.append(f"- Selected renderer treatment signature: `{selected_signature}`")
     routes = []
     for item in _as_list(choice_resolution.get("route_decisions")):
         if not isinstance(item, dict):
@@ -898,6 +1154,7 @@ def _enrich_choice_resolution_from_seed(
         "resolved_choices",
         "route_decisions",
         "design_fields_locked",
+        "selected_renderer_treatment_signature",
         "replay_inputs",
     ):
         if key not in enriched and _non_empty(seed.get(key)):
@@ -941,6 +1198,41 @@ def apply_contract(
         style_system["preset_treatment_profile"] = preset_treatment_profile(
             _text(style_system.get("style_preset")) or "executive-clinical"
         )
+    if not isinstance(style_system.get("style_reference"), dict):
+        profile_reference = _as_dict(_as_dict(style_system.get("preset_treatment_profile")).get("style_reference"))
+        style_system["style_reference"] = profile_reference or preset_style_reference(
+            _text(style_system.get("style_preset")) or "executive-clinical"
+        )
+    else:
+        reference = _as_dict(style_system.get("style_reference"))
+        if not isinstance(reference.get("layout_playbook"), dict):
+            fallback_reference = preset_style_reference(_text(style_system.get("style_preset")) or "executive-clinical")
+            if isinstance(fallback_reference.get("layout_playbook"), dict):
+                reference["layout_playbook"] = fallback_reference["layout_playbook"]
+            if not isinstance(reference.get("publish_safety"), dict) and isinstance(fallback_reference.get("publish_safety"), dict):
+                reference["publish_safety"] = fallback_reference["publish_safety"]
+            if not isinstance(reference.get("style_source_intake"), dict) and isinstance(fallback_reference.get("style_source_intake"), dict):
+                reference["style_source_intake"] = fallback_reference["style_source_intake"]
+            if not isinstance(reference.get("style_metric_profile"), dict) and isinstance(fallback_reference.get("style_metric_profile"), dict):
+                reference["style_metric_profile"] = fallback_reference["style_metric_profile"]
+        if not isinstance(reference.get("content_recipe_library"), dict):
+            fallback_reference = preset_style_reference(_text(style_system.get("style_preset")) or "executive-clinical")
+            if isinstance(fallback_reference.get("content_recipe_library"), dict):
+                reference["content_recipe_library"] = fallback_reference["content_recipe_library"]
+        if not isinstance(reference.get("structural_motif_library"), dict):
+            fallback_reference = preset_style_reference(_text(style_system.get("style_preset")) or "executive-clinical")
+            if isinstance(fallback_reference.get("structural_motif_library"), dict):
+                reference["structural_motif_library"] = fallback_reference["structural_motif_library"]
+        if not isinstance(reference.get("style_metric_profile"), dict):
+            fallback_reference = preset_style_reference(_text(style_system.get("style_preset")) or "executive-clinical")
+            if isinstance(fallback_reference.get("style_metric_profile"), dict):
+                reference["style_metric_profile"] = fallback_reference["style_metric_profile"]
+        style_system["style_reference"] = reference
+    style_system["renderer_treatment_fields"] = list(RENDERER_TREATMENT_FIELDS)
+    style_system["renderer_treatment_defaults"] = _renderer_treatment_base_defaults(style_system)
+    style_system["renderer_treatment_signature"] = renderer_treatment_summary(
+        _renderer_treatment_values(style_system)
+    )["signature"]
     structure = _as_dict(contract.get("structure_blueprint"))
     evidence = _as_dict(contract.get("evidence_and_assets"))
     continuity = _as_dict(contract.get("continuity_rules"))
@@ -965,6 +1257,12 @@ def apply_contract(
         choice_resolution,
         design,
     )
+    if style_system.get("renderer_treatment_signature") and not _non_empty(
+        choice_resolution.get("selected_renderer_treatment_signature")
+    ):
+        choice_resolution["selected_renderer_treatment_signature"] = style_system.get(
+            "renderer_treatment_signature"
+        )
     reproducibility_contract = _reproducibility_contract_from(
         contract,
         style_system=style_system,
@@ -1018,6 +1316,8 @@ def apply_contract(
                 "motif_strategy": _as_dict(style_system.get("title_slide_system")).get("title_motif"),
                 "container_strategy": "evidence-first layouts before generic cards",
                 "figure_table_treatment": _as_dict(style_system.get("figure_table_system")).get("figure_table_treatment"),
+                "table_treatment": _as_dict(style_system.get("table_system")).get("table_treatment")
+                or _as_dict(style_system.get("figure_table_system")).get("table_treatment"),
                 "avoid": structure.get("forbidden_variants"),
             },
             "evidence_continuity": {
@@ -1047,6 +1347,7 @@ def apply_contract(
 
     sequence = _as_list(structure.get("slide_sequence"))
     slide_plan = _slide_plan_from(sequence)
+    narrative_arc = _narrative_arc_from_slide_plan(slide_plan) if slide_plan else []
 
     content_path = workspace / "content_plan.json"
     content = _load_json(content_path, {})
@@ -1060,6 +1361,7 @@ def apply_contract(
             "audience": deck_identity.get("audience"),
             "objective": deck_identity.get("target_outcome"),
             "thesis": contract.get("user_request_summary"),
+            "narrative_arc": narrative_arc,
             "target_slide_count": structure.get("target_slide_count"),
             "slide_plan": slide_plan,
             "design_notes": {

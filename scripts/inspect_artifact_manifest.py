@@ -529,6 +529,10 @@ def _output_alias_plan(output: dict[str, Any], *, manifest_generated_by: str) ->
     outline_field_snippets: list[dict[str, Any]] = []
     if image_alias:
         figure_sources = sources
+        figure_caption = (
+            str(readout_summary.get("primary") or "").strip()
+            or f"Generated from {source_label}."
+        )
         outline_field_snippets.append(
             {
                 "variant": "image-sidebar",
@@ -538,6 +542,28 @@ def _output_alias_plan(output: dict[str, Any], *, manifest_generated_by: str) ->
                     "slide_intent": "evidence",
                     "visual_intent": "generated_figure",
                     "assets": {"hero_image": image_alias},
+                    "caption": f"Generated from {source_label} by {generated_by}." if generated_by else f"Generated from {source_label}.",
+                    "sources": figure_sources,
+                    "evidence_needs": [output_id] if output_id else [],
+                    "required_artifact_ids": [str(figure.get("id") or "")] if figure.get("id") else [],
+                },
+            }
+        )
+        outline_field_snippets.append(
+            {
+                "variant": "scientific-figure",
+                "best_for": "figure-first report layout with compact caption and panel label",
+                "fields": {
+                    "variant": "scientific-figure",
+                    "slide_intent": "evidence",
+                    "visual_intent": "figure",
+                    "figures": [
+                        {
+                            "path": image_alias,
+                            "label": "A",
+                            "caption": figure_caption,
+                        }
+                    ],
                     "caption": f"Generated from {source_label} by {generated_by}." if generated_by else f"Generated from {source_label}.",
                     "sources": figure_sources,
                     "evidence_needs": [output_id] if output_id else [],
@@ -573,6 +599,21 @@ def _output_alias_plan(output: dict[str, Any], *, manifest_generated_by: str) ->
                     "slide_intent": "evidence",
                     "visual_intent": "table",
                     "tables": [table_alias],
+                    "sources": table_sources or sources,
+                    "evidence_needs": [output_id] if output_id else [],
+                    "required_artifact_ids": [str(table.get("id") or "")] if table.get("id") else [],
+                },
+            }
+        )
+        outline_field_snippets.append(
+            {
+                "variant": "table",
+                "best_for": "single editable table when the preset prefers boardroom or decision-table treatment",
+                "fields": {
+                    "variant": "table",
+                    "slide_intent": "evidence",
+                    "visual_intent": "table",
+                    "table_data": table_alias,
                     "sources": table_sources or sources,
                     "evidence_needs": [output_id] if output_id else [],
                     "required_artifact_ids": [str(table.get("id") or "")] if table.get("id") else [],

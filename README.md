@@ -136,9 +136,24 @@ short audit/review deck when useful to summarize rendered screenshots, QA
 metrics, and conclusions. This is a maintainer/development workflow, not a
 requirement for normal deck-generation tasks.
 
-## Release Comparison Gallery
+## Release Evidence Galleries
 
-The repo includes a v0.1 release evidence gallery under
+The repo includes release evidence galleries for major style-system updates.
+
+The v0.2.0 style-reference corpus evidence is under
+`decks/style-reference-gallery-20260620-corpus-v1/`. It adds descriptor-only
+public-source inspiration routing, per-preset contact-sheet collections, and
+release evidence proving 13 presets each have browseable `overview`,
+`data_evidence`, and `decision_sources` sheets.
+
+Useful files:
+
+- `decks/style-reference-gallery-20260620-corpus-v1/RELEASE_NOTES_v0.2.0.md`
+- `decks/style-reference-gallery-20260620-corpus-v1/release_manifest_v0.2.0.json`
+- `decks/style-reference-gallery-20260620-corpus-v1/style_reference_contact_sheet.jpg`
+- `decks/style-reference-gallery-20260620-corpus-v1/preset_contact_collections/`
+
+The v0.1 release evidence gallery remains under
 `decks/release-v1.1-showcase-20260619/`. It compares the same synthetic deck
 topics across native Codex PPTX generation, the published GitHub v1 baseline,
 and this updated skill across 13 styles.
