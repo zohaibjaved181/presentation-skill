@@ -12,6 +12,20 @@ Most agent-built slide decks pass automated checks and still look bad. Dead whit
 
 This skill encodes deck design as constraints instead of vibes. A variant grammar restricts what a slide can be. A preset system fixes palette, typography, and density per style family. A descriptor-only corpus of public deck-like records gives the agent style context to pick from instead of inventing from scratch. A QA loop catches layout regressions before the deck ships.
 
+## When to use this skill
+
+Reach for it when an agent needs to:
+
+- generate a PowerPoint `.pptx` from a structured outline
+- redesign, rebuild, or extend an existing slide deck
+- run layout and design QA on a generated deck
+- assemble a lab, clinical, board, investor, or editorial deck with consistent style
+- maintain a reusable presentation workspace that can be re-rendered later
+
+Skip it for text-only brainstorming where no deck artifact is needed, or for one-off `.pptx` mutations when the workspace source is available.
+
+Skill name: `presentation-skill`. Aliases for fuzzy skill matching and search: `powerpoint-deck-builder`, `pptx-skill`, PowerPoint skill, PPTX skill, slide-deck generator, slides generator, deck builder, presentation generator, presentation maker, PowerPoint generator, agent presentation skill, Codex presentation skill, ChatGPT presentation skill.
+
 ## What's actually in the box
 
 - **A pptxgenjs renderer with 13 slide variants.** `title`, `section`, `cards-3`, `split`, `timeline`, `stats`, `kpi-hero`, `comparison-2col`, `matrix`, `chart`, `lab-run-results`, `scientific-figure`, `flow` (Mermaid). Each variant has its own layout discipline so a deck doesn't collapse into bullet-list-after-bullet-list.
@@ -147,3 +161,7 @@ Codex and other OpenAI-style agents trigger this skill for PowerPoint, `.pptx`, 
 ## License
 
 MIT. See [`LICENSE`](LICENSE). Third-party dependencies keep their own licenses; no proprietary slide assets are bundled.
+
+---
+
+**Topics:** powerpoint, pptx, presentation, slide-deck, slides, deck-generator, presentation-generator, agent-skill, codex-skill, chatgpt-skill, openai-agents, pptxgenjs, python-pptx, deck-design, slide-qa, layout-validation, presentation-workspace, lab-report-deck, investor-deck, board-deck, scientific-figure-slides
