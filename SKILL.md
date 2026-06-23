@@ -22,7 +22,7 @@ Trigger this skill on requests to:
 - author or update a reusable deck workspace
 - convert CSV/TSV/XLSX/JSON data into slide-ready figures and tables
 
-Quick-deck mode is the right path for one-shot 5-15 slide decks. Workspace
+Quick-deck mode is the right path for one-shot 5-10 slide decks. Workspace
 mode is for decks that will be iterated, audited, or rebuilt later. See
 `### Quick Deck` and `### Saved Workspace` under Workflow below.
 

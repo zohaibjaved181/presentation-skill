@@ -23,7 +23,7 @@ Reach for it when an agent needs to:
 - assemble a lab, clinical, board, investor, or editorial deck with consistent style
 - maintain a reusable presentation workspace that can be re-rendered later
 
-Quick-deck mode is the right path for one-shot 5-15 slide decks. Workspace mode is for decks that will be iterated, audited, or rebuilt later.
+Quick-deck mode is the right path for one-shot 5-10 slide decks. Workspace mode is for decks that will be iterated, audited, or rebuilt later.
 
 Skip it for text-only brainstorming where no deck artifact is needed, or for direct edits to a generated `.pptx` when its workspace source files are available (fix the source instead).
 
