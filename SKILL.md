@@ -1,6 +1,6 @@
 ---
 name: presentation-skill
-description: "Presentation skill for Codex, ChatGPT agents, and OpenAI-style agents that build, edit, verify, or iterate polished PowerPoint `.pptx` presentations, slides, and slide decks from structured `outline.json` or saved workspaces. Use for editable deck generation, presentation design, source-backed assets, optional generated-image slides, alignment QA, overflow/overlap checks, and reusable deck workspaces. Aliases: `powerpoint-deck-builder`, `pptx-skill`, PowerPoint skill, PPTX skill."
+description: "Presentation skill for Codex, ChatGPT agents, and OpenAI-style agents that build, edit, verify, or iterate polished PowerPoint `.pptx` presentations, slides, and slide decks from structured `outline.json` or saved workspaces. Use for editable deck generation, lab/clinical/scientific deck assembly, investor or board decks, editorial briefs, presentation design, source-backed assets, optional generated-image slides, alignment QA, overflow/overlap checks, layout validation, and reusable deck workspaces. Aliases: `powerpoint-deck-builder`, `pptx-skill`, PowerPoint skill, PPTX skill, slide-deck generator, slides generator, deck builder, presentation generator."
 ---
 
 # Presentation Skill
@@ -9,11 +9,26 @@ Repo-native PowerPoint skill for editable, aligned, QA-checked `.pptx`
 decks. The model plans the story and visual strategy; scripts handle fragile
 rendering, staging, and verification.
 
-Call this skill as `presentation-skill`. Compatibility aliases:
-`powerpoint-deck-builder` and `pptx-skill`.
+## When to invoke this skill
 
-Search aliases: PowerPoint skill, PPTX skill, presentation skill, slide deck
-generator, slides generator, deck builder, presentation generator.
+Trigger this skill on requests to:
+
+- generate a PowerPoint `.pptx`, slide deck, presentation, or slides
+- redesign, rebuild, or extend an existing deck
+- create a lab, clinical, scientific, board, investor, or editorial deck
+- run layout, design, or readability QA on a generated deck
+- author or update a reusable deck workspace
+- convert CSV/TSV/XLSX/JSON data into slide-ready figures and tables
+
+Do not invoke it for text-only brainstorming where no deck artifact is
+needed, or for one-off `.pptx` mutations when the saved workspace source is
+available.
+
+Skill name: `presentation-skill`. Compatibility aliases for fuzzy skill
+matching: `powerpoint-deck-builder`, `pptx-skill`, PowerPoint skill, PPTX
+skill, slide-deck generator, slides generator, deck builder, presentation
+generator, presentation maker, PowerPoint generator, Codex presentation
+skill, ChatGPT presentation skill, OpenAI agent presentation skill.
 
 ## Non-Negotiables
 
