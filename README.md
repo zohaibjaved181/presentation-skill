@@ -2,9 +2,9 @@
 
 A skill for coding agents that produces editable PowerPoint decks from structured source files. The idea is to treat a deck like code: `outline.json` is the source, scripts build the `.pptx`, and a validation loop checks layout, density, and design-taste issues before delivery.
 
-![Codex native vs updated presentation-skill](decks/native-vs-latest-random-topics-20260623/readme_images/codex_native_vs_updated_clean_hero.png)
+![presentation-skill variant proof board](decks/native-vs-latest-random-topics-20260623/readme_images/presentation_skill_variant_proof.png)
 
-*Same random topic generated two ways: Codex native baseline vs updated presentation-skill.*
+*Rendered samples across the renderer variants, plus the source-first workflow that keeps decks reproducible.*
 
 ## Why
 
@@ -38,6 +38,10 @@ Skill name: `presentation-skill`. Aliases for fuzzy skill matching and search: `
 - **Workspace mode for decks you'll rebuild later.** `design_brief.json`, `content_plan.json`, `evidence_plan.json`, `asset_plan.json`, `outline.json`, and `notes.md` live in a folder. Readiness diagnostics tell the agent what to fix next instead of re-running blind.
 
 ## See it
+
+[![presentation-skill style family proof board](decks/native-vs-latest-random-topics-20260623/readme_images/presentation_skill_style_family_proof.png)](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.7.0)
+
+The style board samples one rendered slide per preset family so the differences are visible as structure, not only palette.
 
 [![Codex native vs updated presentation-skill comparison](decks/native-vs-latest-random-topics-20260623/readme_images/codex_native_vs_updated_clean_three_topics.png)](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.7.0)
 
@@ -148,7 +152,7 @@ Codex and other OpenAI-style agents trigger this skill for PowerPoint, `.pptx`, 
 
 ## Releases
 
-- [`v0.7.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.7.0) — optional first-class atom composition in the normal deck-start/design-contract/style-router workflow, plus clean Codex-native vs updated-skill README comparison images.
+- [`v0.7.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.7.0) — optional first-class atom composition in the normal deck-start/design-contract/style-router workflow, plus README proof boards for renderer variants, style families, and Codex-native vs updated-skill comparison.
 - [`v0.6.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.6.0) — topic-aware atom router, stricter reproducible composition prompts, readable stats rendering, refreshed random-topic evidence gallery.
 - [`v0.5.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.5.0) — descriptor-only style corpus (~2,000 records), random-topic comparison gallery, design-catalog selector.
 - [`v0.2.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.2.0) — per-preset contact sheets, style-reference routing.

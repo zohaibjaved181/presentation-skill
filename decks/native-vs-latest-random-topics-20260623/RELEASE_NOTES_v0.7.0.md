@@ -16,13 +16,16 @@ workspace workflow, not only in release comparison builders.
 - `apply_deck_intake_answers.py` and `apply_design_contract.py` preserve atom
   choices in `choice_resolution`, `style_system`, and reproducibility replay
   metadata.
-- README imagery now compares Codex-native output directly against the updated
-  skill without preset labels or QA-summary text on the contact sheet.
+- README imagery now leads with renderer-variant and style-family proof boards,
+  then keeps the clean Codex-native vs updated-skill comparison as supporting
+  evidence.
 
 ## Release Evidence
 
 - Clean README hero:
-  `decks/native-vs-latest-random-topics-20260623/readme_images/codex_native_vs_updated_clean_hero.png`
+  `decks/native-vs-latest-random-topics-20260623/readme_images/presentation_skill_variant_proof.png`
+- Style-family proof board:
+  `decks/native-vs-latest-random-topics-20260623/readme_images/presentation_skill_style_family_proof.png`
 - Clean three-topic comparison:
   `decks/native-vs-latest-random-topics-20260623/readme_images/codex_native_vs_updated_clean_three_topics.png`
 
