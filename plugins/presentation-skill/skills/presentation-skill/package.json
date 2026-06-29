@@ -6,11 +6,11 @@
   "private": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sirilsengolraj-source/presentation-skill.git"
+    "url": "git+https://github.com/siril9/presentation-skill.git"
   },
-  "homepage": "https://github.com/sirilsengolraj-source/presentation-skill#readme",
+  "homepage": "https://github.com/siril9/presentation-skill#readme",
   "bugs": {
-    "url": "https://github.com/sirilsengolraj-source/presentation-skill/issues"
+    "url": "https://github.com/siril9/presentation-skill/issues"
   },
   "keywords": [
     "codex-skill",

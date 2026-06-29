@@ -3,7 +3,7 @@
   "name": "presentation-skill",
   "version": "0.8.0",
   "license": "MIT",
-  "repository": "https://github.com/sirilsengolraj-source/presentation-skill",
+  "repository": "https://github.com/siril9/presentation-skill",
   "summary": "Source-first PowerPoint/PPTX generation skill for Codex, ChatGPT, and OpenAI-style agents.",
   "one_line": "Write outline.json, build editable .pptx decks with scripts, and run layout QA before delivery.",
   "primary_audience": [
@@ -63,7 +63,7 @@
     "variant_board": "decks/native-vs-latest-random-topics-20260623/readme_images/presentation_skill_variant_proof.png",
     "style_family_board": "decks/native-vs-latest-random-topics-20260623/readme_images/presentation_skill_style_family_proof.png",
     "native_vs_updated": "decks/native-vs-latest-random-topics-20260623/readme_images/codex_native_vs_updated_clean_three_topics.png",
-    "release_url": "https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.7.0"
+    "release_url": "https://github.com/siril9/presentation-skill/releases/tag/v0.8.0"
   },
   "default_commands": {
     "build_example": "node scripts/build_deck_pptxgenjs.js --outline examples/outline.json --output out.pptx --style-preset executive-clinical",

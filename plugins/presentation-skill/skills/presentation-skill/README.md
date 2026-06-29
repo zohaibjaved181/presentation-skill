@@ -2,7 +2,7 @@
 
 A skill for coding agents that produces editable PowerPoint decks from structured source files. The idea is to treat a deck like code: `outline.json` is the source, scripts build the `.pptx`, and a validation loop checks layout, density, and design-taste issues before delivery.
 
-[![Release](https://img.shields.io/github/v/release/sirilsengolraj-source/presentation-skill?sort=semver)](https://github.com/sirilsengolraj-source/presentation-skill/releases)
+[![Release](https://img.shields.io/github/v/release/siril9/presentation-skill?sort=semver)](https://github.com/siril9/presentation-skill/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-111827.svg)](LICENSE)
 [![Built with pptxgenjs](https://img.shields.io/badge/renderer-pptxgenjs-2563eb.svg)](templates/pptxgenjs/README.md)
 
@@ -45,13 +45,13 @@ Skill name: `presentation-skill`. Aliases for fuzzy skill matching and search: `
 
 ## See it
 
-[![presentation-skill style family proof board](decks/native-vs-latest-random-topics-20260623/readme_images/presentation_skill_style_family_proof.png)](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.7.0)
+[![presentation-skill style family proof board](decks/native-vs-latest-random-topics-20260623/readme_images/presentation_skill_style_family_proof.png)](https://github.com/siril9/presentation-skill/releases/tag/v0.7.0)
 
 The style board samples one rendered slide per preset family so the differences are visible as structure, not only palette.
 
-[![Codex native vs updated presentation-skill comparison](decks/native-vs-latest-random-topics-20260623/readme_images/codex_native_vs_updated_clean_three_topics.png)](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.7.0)
+[![Codex native vs updated presentation-skill comparison](decks/native-vs-latest-random-topics-20260623/readme_images/codex_native_vs_updated_clean_three_topics.png)](https://github.com/siril9/presentation-skill/releases/tag/v0.7.0)
 
-Full release notes and comparison images are in the [v0.7.0 release](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.7.0).
+Full release notes and comparison images are in the [v0.7.0 release](https://github.com/siril9/presentation-skill/releases/tag/v0.7.0).
 
 ## Install
 
@@ -60,7 +60,7 @@ Full release notes and comparison images are in the [v0.7.0 release](https://git
 Add this repo as a Codex plugin marketplace, then open `/plugins` in Codex and install `presentation-skill` from the **Presentation Skill** marketplace:
 
 ```bash
-codex plugin marketplace add sirilsengolraj-source/presentation-skill --ref v0.8.0
+codex plugin marketplace add siril9/presentation-skill --ref v0.8.0
 ```
 
 For local development against a checkout:
@@ -76,7 +76,7 @@ The marketplace entry lives at `.agents/plugins/marketplace.json` and points to 
 Clone or copy this repo into your Codex skills directory:
 
 ```bash
-git clone https://github.com/sirilsengolraj-source/presentation-skill \
+git clone https://github.com/siril9/presentation-skill \
   $CODEX_HOME/skills/presentation-skill
 cd $CODEX_HOME/skills/presentation-skill
 pip install python-pptx "markitdown[pptx]"
@@ -188,12 +188,12 @@ Discovery metadata for agents and shareable summaries for humans live in [`DISCO
 
 ## Releases
 
-- [`v0.8.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.8.0) — Codex plugin packaging, repo marketplace entry, synced plugin skill snapshot, and marketplace install docs.
-- [`v0.7.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.7.0) — optional first-class atom composition in the normal deck-start/design-contract/style-router workflow, plus README proof boards for renderer variants, style families, and Codex-native vs updated-skill comparison.
-- [`v0.6.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.6.0) — topic-aware atom router, stricter reproducible composition prompts, readable stats rendering, refreshed random-topic evidence gallery.
-- [`v0.5.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.5.0) — descriptor-only style corpus (~2,000 records), random-topic comparison gallery, design-catalog selector.
-- [`v0.2.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.2.0) — per-preset contact sheets, style-reference routing.
-- [`v0.1.0`](https://github.com/sirilsengolraj-source/presentation-skill/releases/tag/v0.1.0) — initial release with variant renderer + workspace mode.
+- [`v0.8.0`](https://github.com/siril9/presentation-skill/releases/tag/v0.8.0) — Codex plugin packaging, repo marketplace entry, synced plugin skill snapshot, and marketplace install docs.
+- [`v0.7.0`](https://github.com/siril9/presentation-skill/releases/tag/v0.7.0) — optional first-class atom composition in the normal deck-start/design-contract/style-router workflow, plus README proof boards for renderer variants, style families, and Codex-native vs updated-skill comparison.
+- [`v0.6.0`](https://github.com/siril9/presentation-skill/releases/tag/v0.6.0) — topic-aware atom router, stricter reproducible composition prompts, readable stats rendering, refreshed random-topic evidence gallery.
+- [`v0.5.0`](https://github.com/siril9/presentation-skill/releases/tag/v0.5.0) — descriptor-only style corpus (~2,000 records), random-topic comparison gallery, design-catalog selector.
+- [`v0.2.0`](https://github.com/siril9/presentation-skill/releases/tag/v0.2.0) — per-preset contact sheets, style-reference routing.
+- [`v0.1.0`](https://github.com/siril9/presentation-skill/releases/tag/v0.1.0) — initial release with variant renderer + workspace mode.
 
 ## Further reading
 

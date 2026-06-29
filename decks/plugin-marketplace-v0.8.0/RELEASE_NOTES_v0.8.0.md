@@ -20,7 +20,7 @@ copying a skill folder.
 ## Install
 
 ```bash
-codex plugin marketplace add sirilsengolraj-source/presentation-skill --ref v0.8.0
+codex plugin marketplace add siril9/presentation-skill --ref v0.8.0
 ```
 
 Then open `/plugins` in Codex and install `presentation-skill` from the

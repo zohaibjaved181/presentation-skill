@@ -4,10 +4,10 @@
   "description": "Source-first PowerPoint/PPTX generation for Codex and ChatGPT agents.",
   "author": {
     "name": "Sirilsengolraj",
-    "url": "https://github.com/sirilsengolraj-source"
+    "url": "https://github.com/siril9"
   },
-  "homepage": "https://github.com/sirilsengolraj-source/presentation-skill#readme",
-  "repository": "https://github.com/sirilsengolraj-source/presentation-skill",
+  "homepage": "https://github.com/siril9/presentation-skill#readme",
+  "repository": "https://github.com/siril9/presentation-skill",
   "license": "MIT",
   "keywords": [
     "codex-skill",
@@ -36,7 +36,7 @@
       "Presentations",
       "Quality assurance"
     ],
-    "websiteURL": "https://github.com/sirilsengolraj-source/presentation-skill",
+    "websiteURL": "https://github.com/siril9/presentation-skill",
     "defaultPrompt": [
       "Build a 7-slide editable PowerPoint deck.",
       "Turn this CSV into a lab-style PPTX report.",
