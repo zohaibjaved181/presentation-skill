@@ -50,6 +50,9 @@ If `deck_style`/`compliance` are omitted, current behavior remains:
 - `deck_style.font_pair`: `system_clean_v1`
 - `deck_style.palette_key`: preset palette
 - `deck_style.visual_density`: `medium`
+- `deck_style.page_system`: preset-owned body-page grammar (`clinical-rail`,
+  `board-ledger`, `editorial-field`, `command-canvas`, `lab-plate`, or
+  `investor-thesis`)
 - `deck_style.emoji_mode`: `none`
 - `deck_style.research_visual_mode`: `false`
 - `deck_style.header_mode`: preset treatment (`bar`, `stack`, `eyebrow`, or
@@ -72,6 +75,10 @@ If `deck_style`/`compliance` are omitted, current behavior remains:
 - `deck_style.summary_callout_mode`: preset treatment (`default` or `lab-box`)
 - `deck_style.figure_table_treatment`: evidence-layout treatment
   (`figure-first`, `table-first`, `stats-strip`, or `image-sidebar`)
+- `deck_style.image_sidebar_mode`: figure-led composition (`analysis-rail`,
+  `evidence-mosaic`, or `editorial-atlas`)
+- `deck_style.comparison_mode`: comparison composition (`open-columns` or
+  `scorecard`)
 - `deck_style.footer_page_numbers`: optional boolean for slide index in footer
 - `compliance.attribution_file`: `assets/attribution.csv`
 - `compliance.require_attribution`: `false` unless external CC assets are detected
@@ -87,6 +94,8 @@ If `deck_style`/`compliance` are omitted, current behavior remains:
   seed from the design contract so repeated builds match while different lab
   reports can have different treatment rhythm.
 - `visual_density`: `low | medium | high`
+- `page_system`: stable body-page frame shared across the deck. Keep one
+  coherent page system unless a section intentionally changes visual grammar.
 - `emoji_mode`: `none | selective`
 - `research_visual_mode`: boolean. Use `true` when a deck should actively use
   source-backed images/figures and attribution, usually after running
@@ -368,7 +377,9 @@ Use `variant` to force layout family:
 - `comparison-2col`: two-column side-by-side comparison with dividing rule
   (requires `left: {title, body}` and `right: {title, body}`; optional
   `verdict` caption at the bottom). Best for before/after, hypothesis/result,
-  us/them. Body accepts a string or array of bullet points.
+  us/them. Body accepts a string or array of bullet points. Set
+  `comparison_mode: "scorecard"` for metric-led choices; each side may include
+  `score`, `score_label`, and `metrics: [{label, value, note}]`.
 - `table`: native OOXML table (real rows/columns, not text in card boxes).
   Requires `headers: [...]` and `rows: [[...], ...]` of matching width.
   Optional `caption` (muted line below table) and
@@ -410,6 +421,9 @@ Use `variant` to force layout family:
   workflow screenshots before falling back to generic card grids. Preflight
   warns when an image-sidebar lacks caption, footer, or sources because
   figure/image provenance should stay visible in report decks.
+  Set `image_sidebar_mode` to `analysis-rail` for the classic figure-plus-notes
+  layout, `evidence-mosaic` for a dominant figure plus hero metric/evidence
+  rail, or `editorial-atlas` for a wide figure with three caption columns.
 - `scientific-figure`: multi-panel academic figure slide. Use `figures` or
   `assets.figures` with 1-4 entries such as
   `{ "path": "assets/panel_a.png", "label": "A", "title": "...", "caption": "..." }`.
@@ -496,6 +510,11 @@ Variant-specific fields:
     string (split on ". ") or an array of bullet lines.
   - `verdict` is an optional one-line synthesis rendered in a surface strip
     beneath the two columns.
+  - With `comparison_mode: "scorecard"`, each side may also contain `score`,
+    `score_label`, and up to four `metrics` rows with `label`, `value`, and
+    `note`.
+  - `comparison_body_font_size` optionally sets scorecard row text from `12`
+    pt; it defaults to `15` pt for presentation readability.
 - `promote_card` (for `cards-3`):
   - integer 0, 1, or 2 — the index of the card to render at 2× area on the
     left, with the other two stacked on the right. Breaks the symmetric
@@ -509,6 +528,8 @@ Variant-specific fields:
   - optional numeric body-text override for sidebar bullets. Use it when the
     deck's readability contract needs a larger floor, especially for generated
     lab/data figure slides.
+- `image_sidebar_mode` (for `image-sidebar`): optional `analysis-rail`,
+  `evidence-mosaic`, or `editorial-atlas` composition override.
 - `figures` / `assets.figures` (for `scientific-figure`):
   - array of 1-4 figure objects. Each figure needs `path` or `image`; optional
     `label`, `title`, and `caption` render inside the figure panel.

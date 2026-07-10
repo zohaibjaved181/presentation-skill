@@ -32,7 +32,11 @@ SUPPORTED_CHART_TREATMENTS = [
 ]
 SUPPORTED_TABLE_TREATMENTS = ["standard", "compact-ledger", "readout-sidecar", "decision-matrix", "journal-grid"]
 SUPPORTED_FIGURE_TABLE_TREATMENTS = ["figure-first", "table-first", "stats-strip", "image-sidebar"]
+SUPPORTED_PAGE_SYSTEMS = ["clinical-rail", "board-ledger", "editorial-field", "command-canvas", "lab-plate", "investor-thesis"]
+SUPPORTED_IMAGE_SIDEBAR_MODES = ["analysis-rail", "evidence-mosaic", "editorial-atlas"]
+SUPPORTED_COMPARISON_MODES = ["open-columns", "scorecard"]
 RENDERER_TREATMENT_FIELDS = (
+    "page_system",
     "title_layout",
     "footer_mode",
     "chart_treatment",
@@ -41,12 +45,48 @@ RENDERER_TREATMENT_FIELDS = (
     "stats_mode",
     "matrix_mode",
     "summary_callout_mode",
+    "image_sidebar_mode",
+    "comparison_mode",
 )
 REPORT_SOURCE_FOOTER_PRESETS = {
     "lab-report",
     "paper-journal",
     "executive-clinical",
     "data-heavy-boardroom",
+}
+
+PAGE_SYSTEM_BY_PRESET = {
+    "executive-clinical": "clinical-rail",
+    "data-heavy-boardroom": "board-ledger",
+    "charcoal-safety": "board-ledger",
+    "editorial-minimal": "editorial-field",
+    "paper-journal": "editorial-field",
+    "warm-terracotta": "editorial-field",
+    "arctic-minimal": "clinical-rail",
+    "lavender-ops": "command-canvas",
+    "midnight-neon": "command-canvas",
+    "lab-report": "lab-plate",
+    "forest-research": "lab-plate",
+    "bold-startup-narrative": "investor-thesis",
+    "sunset-investor": "investor-thesis",
+}
+
+IMAGE_SIDEBAR_MODES_BY_PAGE_SYSTEM = {
+    "clinical-rail": ["evidence-mosaic", "analysis-rail"],
+    "board-ledger": ["analysis-rail", "evidence-mosaic"],
+    "editorial-field": ["editorial-atlas", "analysis-rail"],
+    "command-canvas": ["evidence-mosaic", "analysis-rail"],
+    "lab-plate": ["evidence-mosaic", "analysis-rail"],
+    "investor-thesis": ["evidence-mosaic", "editorial-atlas"],
+}
+
+COMPARISON_MODES_BY_PAGE_SYSTEM = {
+    "clinical-rail": ["scorecard", "open-columns"],
+    "board-ledger": ["scorecard", "open-columns"],
+    "editorial-field": ["open-columns", "scorecard"],
+    "command-canvas": ["scorecard", "open-columns"],
+    "lab-plate": ["scorecard", "open-columns"],
+    "investor-thesis": ["scorecard", "open-columns"],
 }
 
 
@@ -62,6 +102,8 @@ BASE_MIX_MATRIX = {
     "table_treatment_pool": list(SUPPORTED_TABLE_TREATMENTS),
     "summary_callout_mode_pool": ["default", "lab-box"],
     "figure_table_treatment_pool": list(SUPPORTED_FIGURE_TABLE_TREATMENTS),
+    "image_sidebar_mode_pool": list(SUPPORTED_IMAGE_SIDEBAR_MODES),
+    "comparison_mode_pool": list(SUPPORTED_COMPARISON_MODES),
     "footer_pool": list(SUPPORTED_FOOTERS),
     "mix_rule": "Resolve restrained renderer treatments from the stable style_seed; override explicitly when the evidence shape requires it.",
     "do_not_mix": [
@@ -347,6 +389,7 @@ def renderer_treatment_defaults_from_mix(preset: str, mix: dict[str, Any]) -> di
     if key in REPORT_SOURCE_FOOTER_PRESETS:
         footer = "source-line"
     return {
+        "page_system": _first_pool_value(mix.get("page_system_pool"), PAGE_SYSTEM_BY_PRESET.get(key, "clinical-rail")),
         "title_layout": _first_pool_value(mix.get("title_layout_pool"), "split-hero"),
         "footer_mode": footer,
         "chart_treatment": _first_pool_value(mix.get("chart_treatment_pool"), "standard"),
@@ -355,6 +398,8 @@ def renderer_treatment_defaults_from_mix(preset: str, mix: dict[str, Any]) -> di
         "stats_mode": _first_pool_value(mix.get("stats_mode_pool"), "tiles"),
         "matrix_mode": _first_pool_value(mix.get("matrix_mode_pool"), "cards"),
         "summary_callout_mode": _first_pool_value(mix.get("summary_callout_mode_pool"), "default"),
+        "image_sidebar_mode": _first_pool_value(mix.get("image_sidebar_mode_pool"), "analysis-rail"),
+        "comparison_mode": _first_pool_value(mix.get("comparison_mode_pool"), "open-columns"),
     }
 
 
@@ -366,6 +411,10 @@ def preset_treatment_profile(preset: str) -> dict[str, Any]:
         BASE_MIX_MATRIX,
         override.get("style_mix_matrix", {}) if isinstance(override.get("style_mix_matrix"), dict) else {},
     )
+    page_system = PAGE_SYSTEM_BY_PRESET.get(key, "clinical-rail")
+    mix["page_system_pool"] = [page_system]
+    mix["image_sidebar_mode_pool"] = list(IMAGE_SIDEBAR_MODES_BY_PAGE_SYSTEM[page_system])
+    mix["comparison_mode_pool"] = list(COMPARISON_MODES_BY_PAGE_SYSTEM[page_system])
     renderer_defaults = renderer_treatment_defaults_from_mix(key, mix)
     profile = {
         "profile_version": PROFILE_VERSION,

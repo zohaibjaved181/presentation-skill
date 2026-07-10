@@ -245,10 +245,11 @@ _VARIANT_DENSITY_MULTIPLIER = {
     "generated-image": 1.25,
     # Figure-plus-sidebar evidence slides intentionally fill the main content
     # zone with a large figure panel and interpretation rail.
-    "image-sidebar": 1.25,
+    "image-sidebar": 1.40,
     "scientific-figure": 1.25,
     "lab-run-results": 1.22,
     "table": 1.24,
+    "comparison-2col": 1.30,
 }
 
 _WHITESPACE_BALANCE_EXEMPT_VARIANTS = {
@@ -275,6 +276,12 @@ def _effective_max_density(base: float, outline_slide: dict[str, Any] | None) ->
     variant = str(outline_slide.get("variant", "")).strip().lower()
     if variant in {"chart", "scientific-figure"}:
         return 1.0
+    if variant == "image-sidebar":
+        mode = str(outline_slide.get("image_sidebar_mode", "")).strip().lower()
+        if mode in {"evidence-mosaic", "editorial-atlas"}:
+            return 1.0
+    if variant == "comparison-2col":
+        return 0.99
     multiplier = _VARIANT_DENSITY_MULTIPLIER.get(variant, 1.0)
     # Structural evidence slides often cover most of the canvas with charts,
     # dashboard panels, native tables, or figure grids. Their readability is

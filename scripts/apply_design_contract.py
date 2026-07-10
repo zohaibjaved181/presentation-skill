@@ -226,11 +226,22 @@ def _source_policy_from(contract: dict[str, Any]) -> str:
 def _renderer_treatment_base_defaults(style_system: dict[str, Any]) -> dict[str, str]:
     explicit = _as_dict(style_system.get("renderer_treatment_defaults"))
     if explicit:
-        return {
-            field: _text(explicit.get(field))
+        profile_defaults = _as_dict(
+            _as_dict(style_system.get("preset_treatment_profile")).get("renderer_treatment_defaults")
+        )
+        merged = {
+            field: _text(profile_defaults.get(field))
             for field in RENDERER_TREATMENT_FIELDS
-            if _text(explicit.get(field))
+            if _text(profile_defaults.get(field))
         }
+        merged.update(
+            {
+                field: _text(explicit.get(field))
+                for field in RENDERER_TREATMENT_FIELDS
+                if _text(explicit.get(field))
+            }
+        )
+        return merged
     mix = _as_dict(style_system.get("style_mix_matrix"))
     if mix:
         return renderer_treatment_defaults_from_mix(
@@ -256,12 +267,15 @@ def _renderer_treatment_values(style_system: dict[str, Any]) -> dict[str, str]:
     stats = _as_dict(style_system.get("stats_system"))
     matrix = _as_dict(style_system.get("matrix_system"))
     summary = _as_dict(style_system.get("summary_callout_system"))
+    image_sidebar = _as_dict(style_system.get("image_sidebar_system"))
+    comparison = _as_dict(style_system.get("comparison_system"))
     values = {
         field: _text(value)
         for field, value in _renderer_treatment_base_defaults(style_system).items()
         if _text(value)
     }
     for field, value in {
+        "page_system": style_system.get("page_system"),
         "title_layout": title.get("title_layout") or style_system.get("title_layout"),
         "footer_mode": footer.get("footer_mode") or style_system.get("footer_mode"),
         "chart_treatment": chart.get("chart_treatment") or style_system.get("chart_treatment"),
@@ -274,6 +288,10 @@ def _renderer_treatment_values(style_system: dict[str, Any]) -> dict[str, str]:
         "matrix_mode": matrix.get("matrix_mode") or style_system.get("matrix_mode"),
         "summary_callout_mode": summary.get("summary_callout_mode")
         or style_system.get("summary_callout_mode"),
+        "image_sidebar_mode": image_sidebar.get("image_sidebar_mode")
+        or style_system.get("image_sidebar_mode"),
+        "comparison_mode": comparison.get("comparison_mode")
+        or style_system.get("comparison_mode"),
     }.items():
         if _text(value):
             values[field] = _text(value)
@@ -293,7 +311,7 @@ def _renderer_treatments(style_system: dict[str, Any]) -> dict[str, Any]:
     defaults = _renderer_treatment_base_defaults(style_system)
     summary = renderer_treatment_summary(values)
     footer_mode = values.get("footer_mode") or footer.get("footer_mode")
-    return {
+    payload = {
         "style_preset": style_system.get("style_preset"),
         "renderer_treatment_fields": list(RENDERER_TREATMENT_FIELDS),
         "renderer_treatment_defaults": defaults,
@@ -316,7 +334,11 @@ def _renderer_treatments(style_system: dict[str, Any]) -> dict[str, Any]:
         "stats_mode": values.get("stats_mode"),
         "matrix_mode": values.get("matrix_mode"),
         "summary_callout_mode": values.get("summary_callout_mode"),
+        "page_system": values.get("page_system"),
+        "image_sidebar_mode": values.get("image_sidebar_mode"),
+        "comparison_mode": values.get("comparison_mode"),
     }
+    return {key: value for key, value in payload.items() if _non_empty(value)}
 
 
 def _slide_plan_from(sequence: list[Any]) -> list[dict[str, Any]]:
@@ -431,6 +453,9 @@ def _append_style_mix_notes(lines: list[str], style_system: dict[str, Any]) -> N
         ("summary_callout_mode_pool", "Summary callouts"),
         ("footer_pool", "Footers"),
         ("figure_table_treatment_pool", "Figure/table treatments"),
+        ("page_system_pool", "Page systems"),
+        ("image_sidebar_mode_pool", "Image/sidebar modes"),
+        ("comparison_mode_pool", "Comparison modes"),
     )
     lines.extend(["", "### Style Mix Ledger"])
     if reference:
@@ -604,6 +629,9 @@ def _reproducibility_contract_from(
         "stats_mode": renderer_values.get("stats_mode"),
         "matrix_mode": renderer_values.get("matrix_mode"),
         "summary_callout_mode": renderer_values.get("summary_callout_mode"),
+        "page_system": renderer_values.get("page_system"),
+        "image_sidebar_mode": renderer_values.get("image_sidebar_mode"),
+        "comparison_mode": renderer_values.get("comparison_mode"),
         "renderer_treatment_fields": list(RENDERER_TREATMENT_FIELDS),
         "renderer_treatment_defaults": renderer_defaults,
         "renderer_treatment_signature": renderer_signature,
@@ -649,6 +677,9 @@ def _reproducibility_contract_from(
         "chart_treatment_pool": _first_list(mix.get("chart_treatment_pool")),
         "table_treatment_pool": _first_list(mix.get("table_treatment_pool")),
         "figure_table_treatment_pool": _first_list(mix.get("figure_table_treatment_pool")),
+        "page_system_pool": _first_list(mix.get("page_system_pool")),
+        "image_sidebar_mode_pool": _first_list(mix.get("image_sidebar_mode_pool")),
+        "comparison_mode_pool": _first_list(mix.get("comparison_mode_pool")),
     }
     for key, value in pool_sources.items():
         if value and not _non_empty(style_replay.get(key)):
@@ -838,6 +869,9 @@ def _append_reproducibility_notes(lines: list[str], replay: dict[str, Any]) -> N
             ("chart_treatment_pool", "Chart pool"),
             ("table_treatment_pool", "Table pool"),
             ("figure_table_treatment_pool", "Figure/table pool"),
+            ("page_system_pool", "Page-system pool"),
+            ("image_sidebar_mode_pool", "Image/sidebar pool"),
+            ("comparison_mode_pool", "Comparison pool"),
         ):
             value = style_replay.get(key)
             text = _compact_text_list(value) if isinstance(value, list) else _text(value)

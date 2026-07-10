@@ -227,11 +227,7 @@ function estimateTextHeight(text, fontSize, boxW, lineHeight) {
 
 function titleFontForLength(title) {
   const len = safeText(title).length;
-  if (len > 100) return 17;
-  if (len > 82) return 17;
-  if (len > 64) return 16;
-  if (len > 52) return 18;
-  if (len > 42) return 20;
+  if (len > 42) return 24;
   return 26;
 }
 
@@ -500,10 +496,85 @@ function addBackgroundImage(slide, imagePath, preset) {
   }));
 }
 
+function addPageSystemChrome(slide, preset, slideData) {
+  const system = String(slideData.page_system || preset.page_system || '').trim().toLowerCase();
+  if (!system || system === 'none') return;
+  const accent = cleanHex(preset.accent_primary, '1493A4');
+  const secondary = cleanHex(preset.accent_secondary, accent);
+  const line = cleanHex(preset.line, 'CBD5E1');
+
+  const addRule = (x, y, w, h, color, transparency = 0) => {
+    slide.addShape('rect', shapeOpts({
+      x, y, w, h,
+      fill: { color, transparency },
+      line: { color, transparency: 100, width: 0 },
+    }));
+  };
+
+  if (system === 'clinical-rail') {
+    addRule(0.15, 0.28, 0.035, 6.58, accent);
+    [1.48, 3.72, 5.96].forEach((y, idx) => {
+      slide.addShape('ellipse', shapeOpts({
+        x: 0.10,
+        y,
+        w: 0.13,
+        h: 0.13,
+        fill: { color: idx === 1 ? secondary : preset.bg || 'FFFFFF' },
+        line: { color: idx === 1 ? secondary : accent, width: 0.8 },
+      }));
+    });
+    return;
+  }
+
+  if (system === 'board-ledger') {
+    addRule(SLIDE_W - 1.82, 0.0, 1.82, 0.16, accent);
+    [SLIDE_W - 1.60, SLIDE_W - 1.30, SLIDE_W - 1.00].forEach((x) => {
+      addRule(x, 0.16, 0.012, 0.34, line, 18);
+    });
+    addRule(0, SLIDE_H - 0.10, SLIDE_W, 0.025, line);
+    addRule(SLIDE_W - 3.15, SLIDE_H - 0.10, 3.15, 0.025, secondary);
+    return;
+  }
+
+  if (system === 'editorial-field') {
+    addRule(0.34, 1.10, 0.018, 5.72, line);
+    addRule(0.30, 1.10, 0.10, 0.82, accent);
+    addRule(0.30, 6.42, 0.10, 0.40, accent);
+    return;
+  }
+
+  if (system === 'command-canvas') {
+    const corner = (x, y, flipX, flipY) => {
+      addRule(x + (flipX ? -0.36 : 0), y, 0.36, 0.025, accent, 12);
+      addRule(x, y + (flipY ? -0.36 : 0), 0.025, 0.36, accent, 12);
+    };
+    corner(0.22, 1.08, false, false);
+    corner(SLIDE_W - 0.22, 1.08, true, false);
+    corner(0.22, SLIDE_H - 0.30, false, true);
+    corner(SLIDE_W - 0.22, SLIDE_H - 0.30, true, true);
+    addRule(SLIDE_W - 0.56, 1.42, 0.012, 4.90, line, 48);
+    return;
+  }
+
+  if (system === 'lab-plate') {
+    [0.72, 1.02, 1.32].forEach((x, idx) => addRule(x, 0.07, 0.18, 0.025, idx === 1 ? secondary : line));
+    addRule(MARGIN_X, SLIDE_H - 0.28, SLIDE_W - MARGIN_X * 2, 0.014, line);
+    addRule(MARGIN_X, SLIDE_H - 0.24, 1.45, 0.026, secondary);
+    return;
+  }
+
+  if (system === 'investor-thesis') {
+    addRule(SLIDE_W - 0.14, 1.04, 0.14, 5.98, accent);
+    addRule(SLIDE_W - 1.42, 1.04, 1.28, 0.06, secondary);
+    addRule(SLIDE_W - 0.62, 1.28, 0.48, 0.018, line);
+  }
+}
+
 function addDarkTitleBar(slide, preset, title, subtitle, slideData = {}) {
   // Full-bleed dark bar at the top of every content slide. The bar height is
   // measured from the title/subtitle stack so folded titles reserve real space
   // before the body layout starts.
+  addPageSystemChrome(slide, preset, slideData);
   const headerMode = String(slideData.header_mode || preset.header_mode || 'bar').trim().toLowerCase();
   const isLabHeader = headerMode === 'lab-clean' || headerMode === 'lab-card';
   const metrics = isLabHeader
@@ -3857,7 +3928,225 @@ function renderLabRunResults(pptx, slide, slideData, preset) {
 // Mirrors build_deck.py's _add_comparison_content composition.
 // ---------------------------------------------------------------------------
 
+function comparisonMetricRows(spec) {
+  if (Array.isArray(spec.metrics)) {
+    return spec.metrics.slice(0, 4).map((item) => ({
+      label: safeText(item && (item.label || item.name || item.title)),
+      value: safeText(item && (item.value || item.score || item.status)),
+      note: safeText(item && (item.note || item.context)),
+    })).filter((item) => item.label || item.value || item.note);
+  }
+  const body = Array.isArray(spec.body)
+    ? spec.body.map((item) => safeText(item)).filter(Boolean)
+    : safeText(spec.body).split(/\n|(?<=\.)\s+/).map((item) => item.trim()).filter(Boolean);
+  return body.slice(0, 4).map((item) => ({ label: item, value: '', note: '' }));
+}
+
+function renderComparisonScorecard(pptx, slide, slideData, preset) {
+  paintBackground(slide, preset.bg);
+  const header = addDarkTitleBar(slide, preset, slideData.title, slideData.subtitle, slideData);
+  const left = (slideData.left && typeof slideData.left === 'object') ? slideData.left : {};
+  const right = (slideData.right && typeof slideData.right === 'object') ? slideData.right : {};
+  const verdict = safeText(slideData.verdict || slideData.takeaway);
+  const hasFooter = hasFooterChrome(slideData, preset);
+  const usableW = SLIDE_W - MARGIN_X * 2;
+  const gutter = 0.34;
+  const colW = (usableW - gutter) / 2;
+  const top = header.contentTop + 0.18;
+  const footerReserve = hasFooter ? 0.52 : 0.18;
+  const verdictH = verdict ? 0.54 : 0;
+  const verdictGap = verdict ? 0.10 : 0;
+  const bottom = SLIDE_H - footerReserve - verdictH - verdictGap;
+  const scoreH = 0.78;
+  const rowTop = top + scoreH + 0.06;
+  const rowH = Math.max(0.68, bottom - rowTop);
+  const requestedBodyFont = Number(slideData.comparison_body_font_size || 15);
+  const bodyFontSize = Number.isFinite(requestedBodyFont) && requestedBodyFont >= 12
+    ? requestedBodyFont
+    : 15;
+
+  const renderHead = (spec, x, accent) => {
+    const title = safeText(spec.title, 'Option');
+    const score = safeText(spec.score || spec.value || spec.primary_metric);
+    const hasScore = Boolean(score);
+    const scoreLabel = safeText(spec.score_label || spec.label || spec.subtitle);
+    slide.addShape('rect', shapeOpts({
+      x,
+      y: top,
+      w: colW,
+      h: scoreH,
+      fill: { color: preset.surface || 'FFFFFF' },
+      line: { color: preset.line, width: 0.6 },
+    }));
+    slide.addShape('rect', shapeOpts({
+      x,
+      y: top,
+      w: 0.07,
+      h: scoreH,
+      fill: { color: accent },
+      line: { color: accent, width: 0 },
+    }));
+    slide.addText(title, textOpts({
+      x: x + 0.20,
+      y: top + 0.10,
+      w: hasScore ? colW * 0.55 : colW - 0.40,
+      h: 0.32,
+      fontFace: preset.font_heading,
+      fontSize: 14,
+      bold: true,
+      color: accent,
+      fit: 'shrink',
+    }));
+    if (hasScore) {
+      slide.addText(score, textOpts({
+        x: x + colW * 0.62,
+        y: top + 0.04,
+        w: colW * 0.32,
+        h: 0.52,
+        fontFace: preset.font_title,
+        fontSize: score.length > 8 ? 21 : 25,
+        bold: true,
+        color: preset.text,
+        align: 'right',
+        fit: 'shrink',
+      }));
+    }
+    if (scoreLabel) {
+      slide.addText(scoreLabel, textOpts({
+        x: x + 0.20,
+        y: top + 0.54,
+        w: colW - 0.40,
+        h: 0.20,
+        fontFace: preset.font_body,
+        fontSize: 9.5,
+        color: preset.text_muted,
+        fit: 'shrink',
+      }));
+    }
+  };
+
+  const renderRows = (spec, x, accent) => {
+    const rows = comparisonMetricRows(spec);
+    const gap = 0.10;
+    const eachH = (rowH - gap * Math.max(0, rows.length - 1)) / Math.max(1, rows.length);
+    rows.forEach((row, idx) => {
+      const y = rowTop + idx * (eachH + gap);
+      slide.addShape('rect', shapeOpts({
+        x,
+        y,
+        w: colW,
+        h: eachH,
+        fill: { color: idx % 2 === 0 ? (preset.surface || 'FFFFFF') : preset.bg },
+        line: { color: preset.line, width: 0.45 },
+      }));
+      slide.addText([
+        {
+          text: row.label,
+          options: {
+            fontFace: preset.font_body,
+            fontSize: bodyFontSize,
+            bold: true,
+            color: accent,
+            breakLine: Boolean(row.note),
+            paraSpaceAfter: 3,
+          },
+        },
+        {
+          text: row.note,
+          options: {
+            fontFace: preset.font_body,
+            fontSize: bodyFontSize,
+            color: preset.text,
+          },
+        },
+      ], textOpts({
+        x: x + 0.14,
+        y: y + 0.04,
+        w: colW * 0.70,
+        h: Math.max(0.40, eachH - 0.08),
+        fontFace: preset.font_body,
+        fontSize: bodyFontSize,
+        color: preset.text,
+        valign: 'top',
+        fit: 'shrink',
+      }));
+      if (row.value) {
+        slide.addText(row.value, textOpts({
+          x: x + colW * 0.74,
+          y: y + 0.04,
+          w: colW * 0.22 - 0.08,
+          h: Math.max(0.40, eachH - 0.08),
+          fontFace: preset.font_heading,
+          fontSize: 12,
+          bold: true,
+          color: preset.text,
+          align: 'right',
+          valign: 'top',
+          fit: 'shrink',
+        }));
+      }
+    });
+  };
+
+  renderHead(left, MARGIN_X, preset.accent_primary);
+  renderHead(right, MARGIN_X + colW + gutter, preset.accent_secondary);
+  renderRows(left, MARGIN_X, preset.accent_primary);
+  renderRows(right, MARGIN_X + colW + gutter, preset.accent_secondary);
+
+  slide.addText('VS', textOpts({
+    x: MARGIN_X + colW + gutter / 2 - 0.18,
+    y: top + 0.41,
+    w: 0.36,
+    h: 0.24,
+    fontFace: preset.font_heading,
+    fontSize: 9,
+    bold: true,
+    color: preset.text_muted,
+    align: 'center',
+  }));
+
+  if (verdict) {
+    const y = bottom + verdictGap;
+    slide.addShape('rect', shapeOpts({
+      x: MARGIN_X,
+      y,
+      w: usableW,
+      h: verdictH,
+      fill: { color: preset.bg_dark },
+      line: { color: preset.bg_dark, width: 0 },
+    }));
+    slide.addShape('rect', shapeOpts({
+      x: MARGIN_X,
+      y,
+      w: 0.10,
+      h: verdictH,
+      fill: { color: preset.accent_secondary },
+      line: { color: preset.accent_secondary, width: 0 },
+    }));
+    slide.addText(verdict, textOpts({
+      x: MARGIN_X + 0.24,
+      y: y + 0.07,
+      w: usableW - 0.40,
+      h: verdictH - 0.14,
+      fontFace: preset.font_body,
+      fontSize: 15,
+      bold: true,
+      color: 'FFFFFF',
+      valign: 'middle',
+      fit: 'shrink',
+    }));
+  }
+
+  addFooter(slide, preset, slideData);
+  attachNotes(slide, slideData);
+}
+
 function renderComparison2col(pptx, slide, slideData, preset) {
+  const mode = String(slideData.comparison_mode || preset.comparison_mode || 'open-columns').trim().toLowerCase();
+  if (mode === 'scorecard') {
+    renderComparisonScorecard(pptx, slide, slideData, preset);
+    return;
+  }
   paintBackground(slide, preset.bg);
   const header = addDarkTitleBar(slide, preset, slideData.title, slideData.subtitle, slideData);
 
@@ -3974,7 +4263,8 @@ function renderComparison2col(pptx, slide, slideData, preset) {
 function renderMatrixOpenQuadrants(slide, slideData, preset, header, quadrants, iconPaths) {
   const usableW = SLIDE_W - MARGIN_X * 2;
   const topY = header.contentTop + 0.25;
-  const usableH = SLIDE_H - topY - 0.70;
+  const hasSummary = Boolean(safeText(slideData.summary_callout || slideData.key_summary || slideData.takeaway));
+  const usableH = SLIDE_H - topY - 0.70 - (hasSummary ? 0.72 : 0);
   const centerX = MARGIN_X + usableW / 2;
   const centerY = topY + usableH / 2;
   const gutter = 0.34;
@@ -4086,7 +4376,8 @@ function renderMatrix(pptx, slide, slideData, preset) {
   const usableW = SLIDE_W - MARGIN_X * 2;
   const cardW = (usableW - gutter) / 2;
   const topY = header.contentTop + 0.20;
-  const usableH = SLIDE_H - topY - 0.65;
+  const hasSummary = Boolean(safeText(slideData.summary_callout || slideData.key_summary || slideData.takeaway));
+  const usableH = SLIDE_H - topY - 0.65 - (hasSummary ? 0.72 : 0);
   const cardH = (usableH - gutter) / 2;
   const iconPaths = Array.isArray(slideData.__iconPaths) ? slideData.__iconPaths : [];
 
@@ -4325,7 +4616,315 @@ function sectionBodyLines(section) {
     .slice(0, 4);
 }
 
+function sidebarPrimaryMetric(slideData) {
+  const candidates = [];
+  if (slideData.value || slideData.label) {
+    candidates.push({ value: slideData.value, label: slideData.label, context: slideData.context });
+  }
+  ['facts', 'stats', 'evidence'].forEach((key) => {
+    if (Array.isArray(slideData[key])) candidates.push(...slideData[key]);
+  });
+  const first = candidates.find((item) => item && (item.value || item.number || item.metric));
+  if (!first) return null;
+  return {
+    value: safeText(first.value || first.number || first.metric),
+    label: safeText(first.label || first.title || first.name, 'Primary readout'),
+    context: safeText(first.context || first.note || first.detail),
+  };
+}
+
+function renderImageSidebarEvidenceMosaic(pptx, slide, slideData, preset) {
+  paintBackground(slide, preset.bg);
+  const header = addDarkTitleBar(slide, preset, slideData.title, slideData.subtitle, slideData);
+  const imagePath = slideData.__heroPath || slideData.__generatedImagePath;
+  const hasImage = imagePath && fs.existsSync(imagePath);
+  const metric = sidebarPrimaryMetric(slideData);
+  const sections = normalizeSidebarSections(slideData).slice(0, 2);
+  const takeaway = safeText(slideData.takeaway || slideData.interpretation || slideData.summary_callout);
+  const caption = safeText(slideData.caption);
+  const hasFooter = hasFooterChrome(slideData, preset);
+  const contentY = header.contentTop + 0.18;
+  const footerReserve = hasFooter ? 0.56 : 0.20;
+  const takeawayH = takeaway ? 0.62 : 0;
+  const takeawayGap = takeaway ? 0.10 : 0;
+  const contentH = SLIDE_H - contentY - footerReserve - takeawayH - takeawayGap;
+  const usableW = SLIDE_W - MARGIN_X * 2;
+  const gutter = 0.34;
+  const imageW = usableW * 0.63;
+  const railX = MARGIN_X + imageW + gutter;
+  const railW = usableW - imageW - gutter;
+
+  slide.addShape('rect', shapeOpts({
+    x: MARGIN_X,
+    y: contentY,
+    w: imageW,
+    h: contentH,
+    fill: { color: preset.surface || 'FFFFFF' },
+    line: { color: preset.line, width: 0.65 },
+  }));
+  if (hasImage) {
+    const captionReserve = caption ? 0.32 : 0;
+    const sized = imageSizingContainLocal(
+      imagePath,
+      MARGIN_X + 0.06,
+      contentY + 0.06,
+      imageW - 0.12,
+      contentH - 0.12 - captionReserve,
+    );
+    slide.addImage(Object.assign({ path: imagePath }, sized));
+    if (caption) {
+      slide.addText(caption, textOpts({
+        x: MARGIN_X + 0.12,
+        y: contentY + contentH - 0.30,
+        w: imageW - 0.24,
+        h: 0.22,
+        fontFace: preset.font_body,
+        fontSize: 8,
+        italic: true,
+        color: preset.text_muted,
+        fit: 'shrink',
+      }));
+    }
+  }
+
+  let railY = contentY;
+  if (metric) {
+    const metricH = 1.10;
+    slide.addShape('rect', shapeOpts({
+      x: railX,
+      y: railY,
+      w: railW,
+      h: metricH,
+      fill: { color: preset.bg_dark },
+      line: { color: preset.bg_dark, width: 0 },
+    }));
+    slide.addShape('rect', shapeOpts({
+      x: railX,
+      y: railY,
+      w: 0.07,
+      h: metricH,
+      fill: { color: preset.accent_secondary || preset.accent_primary },
+      line: { color: preset.accent_secondary || preset.accent_primary, width: 0 },
+    }));
+    slide.addText(metric.value, textOpts({
+      x: railX + 0.20,
+      y: railY + 0.08,
+      w: railW - 0.38,
+      h: 0.56,
+      fontFace: preset.font_title,
+      fontSize: metric.value.length > 10 ? 23 : 28,
+      bold: true,
+      color: 'FFFFFF',
+      valign: 'top',
+      fit: 'shrink',
+    }));
+    slide.addText(metric.label, textOpts({
+      x: railX + 0.20,
+      y: railY + 0.72,
+      w: railW - 0.38,
+      h: 0.24,
+      fontFace: preset.font_body,
+      fontSize: 12,
+      color: preset.accent_primary,
+      valign: 'top',
+      fit: 'shrink',
+    }));
+    railY += metricH + 0.10;
+  }
+
+  const sectionGap = 0.08;
+  const availableH = Math.max(0.8, contentY + contentH - railY);
+  const sectionH = (availableH - sectionGap * Math.max(0, sections.length - 1)) / Math.max(1, sections.length);
+  sections.forEach((section, idx) => {
+    const y = railY + idx * (sectionH + sectionGap);
+    const accent = idx % 2 === 0 ? preset.accent_primary : preset.accent_secondary;
+    slide.addShape('rect', shapeOpts({
+      x: railX,
+      y,
+      w: railW,
+      h: sectionH,
+      fill: { color: preset.surface || 'FFFFFF' },
+      line: { color: preset.line, width: 0.6 },
+    }));
+    slide.addShape('rect', shapeOpts({
+      x: railX,
+      y,
+      w: railW,
+      h: 0.045,
+      fill: { color: accent },
+      line: { color: accent, width: 0 },
+    }));
+    const title = safeText(section.title || section.label, `Evidence ${idx + 1}`);
+    const lines = sectionBodyLines(section);
+    slide.addText([
+      {
+        text: title,
+        options: {
+          fontFace: preset.font_heading,
+          fontSize: 12,
+          bold: true,
+          color: accent,
+          breakLine: Boolean(lines.length),
+          paraSpaceAfter: 5,
+        },
+      },
+      {
+        text: lines.join(' '),
+        options: {
+          fontFace: preset.font_body,
+          fontSize: 12,
+          color: preset.text,
+        },
+      },
+    ], textOpts({
+      x: railX + 0.14,
+      y: y + 0.04,
+      w: railW - 0.28,
+      h: Math.max(0.70, sectionH - 0.08),
+      fontFace: preset.font_body,
+      fontSize: 12,
+      color: preset.text,
+      valign: 'top',
+      fit: 'shrink',
+    }));
+  });
+
+  if (takeaway) {
+    const y = contentY + contentH + takeawayGap;
+    slide.addShape('rect', shapeOpts({
+      x: MARGIN_X,
+      y,
+      w: usableW,
+      h: takeawayH,
+      fill: { color: preset.surface || 'FFFFFF' },
+      line: { color: preset.line, width: 0.6 },
+    }));
+    slide.addShape('rect', shapeOpts({
+      x: MARGIN_X,
+      y,
+      w: 0.08,
+      h: takeawayH,
+      fill: { color: preset.accent_primary },
+      line: { color: preset.accent_primary, width: 0 },
+    }));
+    slide.addText(takeaway, textOpts({
+      x: MARGIN_X + 0.22,
+      y: y + 0.08,
+      w: usableW - 0.38,
+      h: takeawayH - 0.16,
+      fontFace: preset.font_body,
+      fontSize: 12.5,
+      bold: true,
+      color: preset.text,
+      valign: 'middle',
+      fit: 'shrink',
+    }));
+  }
+
+  addFooter(slide, preset, slideData);
+  attachNotes(slide, slideData);
+}
+
+function renderImageSidebarEditorialAtlas(pptx, slide, slideData, preset) {
+  paintBackground(slide, preset.bg);
+  const header = addDarkTitleBar(slide, preset, slideData.title, slideData.subtitle, slideData);
+  const imagePath = slideData.__heroPath || slideData.__generatedImagePath;
+  const hasImage = imagePath && fs.existsSync(imagePath);
+  const sections = normalizeSidebarSections(slideData).slice(0, 3);
+  const caption = safeText(slideData.caption);
+  const hasFooter = hasFooterChrome(slideData, preset);
+  const contentY = header.contentTop + 0.16;
+  const footerReserve = hasFooter ? 0.54 : 0.18;
+  const usableW = SLIDE_W - MARGIN_X * 2;
+  const totalH = SLIDE_H - contentY - footerReserve;
+  const noteH = Math.max(1.05, totalH * 0.28);
+  const imageH = totalH - noteH - 0.18;
+
+  slide.addShape('rect', shapeOpts({
+    x: MARGIN_X,
+    y: contentY,
+    w: usableW,
+    h: imageH,
+    fill: { color: preset.surface || 'FFFFFF' },
+    line: { color: preset.line, width: 0.6 },
+  }));
+  if (hasImage) {
+    const sized = imageSizingContainLocal(imagePath, MARGIN_X + 0.05, contentY + 0.05, usableW - 0.10, imageH - 0.10);
+    slide.addImage(Object.assign({ path: imagePath }, sized));
+  }
+  if (caption) {
+    slide.addShape('rect', shapeOpts({
+      x: MARGIN_X,
+      y: contentY + imageH - 0.34,
+      w: usableW,
+      h: 0.34,
+      fill: { color: preset.bg_dark, transparency: 12 },
+      line: { color: preset.bg_dark, transparency: 100, width: 0 },
+    }));
+    slide.addText(caption, textOpts({
+      x: MARGIN_X + 0.14,
+      y: contentY + imageH - 0.29,
+      w: usableW - 0.28,
+      h: 0.22,
+      fontFace: preset.font_body,
+      fontSize: 8.5,
+      color: 'FFFFFF',
+      italic: true,
+      fit: 'shrink',
+    }));
+  }
+
+  const noteY = contentY + imageH + 0.18;
+  const gap = 0.24;
+  const colW = (usableW - gap * 2) / 3;
+  sections.forEach((section, idx) => {
+    const x = MARGIN_X + idx * (colW + gap);
+    const accent = idx === 1 ? preset.accent_secondary : preset.accent_primary;
+    slide.addShape('rect', shapeOpts({
+      x,
+      y: noteY,
+      w: colW,
+      h: 0.04,
+      fill: { color: accent },
+      line: { color: accent, width: 0 },
+    }));
+    slide.addText(safeText(section.title || section.label, `View ${idx + 1}`), textOpts({
+      x,
+      y: noteY + 0.11,
+      w: colW,
+      h: 0.23,
+      fontFace: preset.font_heading,
+      fontSize: 11,
+      bold: true,
+      color: accent,
+    }));
+    slide.addText(sectionBodyLines(section).join('\n'), textOpts({
+      x,
+      y: noteY + 0.40,
+      w: colW,
+      h: Math.max(0.30, noteH - 0.40),
+      fontFace: preset.font_body,
+      fontSize: 12,
+      color: preset.text,
+      valign: 'top',
+      fit: 'shrink',
+    }));
+  });
+
+  addFooter(slide, preset, slideData);
+  attachNotes(slide, slideData);
+}
+
 function renderImageSidebar(pptx, slide, slideData, preset) {
+  const mode = String(slideData.image_sidebar_mode || preset.image_sidebar_mode || 'analysis-rail').trim().toLowerCase();
+  if (mode === 'evidence-mosaic') {
+    renderImageSidebarEvidenceMosaic(pptx, slide, slideData, preset);
+    return;
+  }
+  if (mode === 'editorial-atlas') {
+    renderImageSidebarEditorialAtlas(pptx, slide, slideData, preset);
+    return;
+  }
   paintBackground(slide, preset.bg);
   const header = addDarkTitleBar(slide, preset, slideData.title, slideData.subtitle, slideData);
 

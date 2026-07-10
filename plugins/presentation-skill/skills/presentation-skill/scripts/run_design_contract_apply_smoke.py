@@ -27,6 +27,7 @@ ANSWER_FIXTURES = {
     "audience_context": "PI and translational assay team; dense leave-behind review.",
 }
 EXPECTED_RENDERER_TREATMENT_DEFAULTS = {
+    "page_system": "lab-plate",
     "title_layout": "lab-plate",
     "footer_mode": "source-line",
     "chart_treatment": "minimal",
@@ -35,6 +36,8 @@ EXPECTED_RENDERER_TREATMENT_DEFAULTS = {
     "stats_mode": "tiles",
     "matrix_mode": "cards",
     "summary_callout_mode": "lab-box",
+    "image_sidebar_mode": "evidence-mosaic",
+    "comparison_mode": "scorecard",
 }
 EXPECTED_RENDERER_TREATMENT_SIGNATURE = "|".join(
     f"{key}:{value}"

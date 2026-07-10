@@ -45,6 +45,10 @@ Skill name: `presentation-skill`. Aliases for fuzzy skill matching and search: `
 
 ## See it
 
+![Model-adaptive Europa signal triage proof deck](examples/model_adaptive_showcase_contact_sheet.jpg)
+
+One source deck, seven content compositions: KPI hero, evidence mosaic, scorecard, figure atlas, native chart, lab ledger, and decision matrix. The page system changes with the content job instead of repeating one card grammar.
+
 [![presentation-skill style family proof board](decks/native-vs-latest-random-topics-20260623/readme_images/presentation_skill_style_family_proof.png)](https://github.com/siril9/presentation-skill/releases/tag/v0.7.0)
 
 The style board samples one rendered slide per preset family so the differences are visible as structure, not only palette.

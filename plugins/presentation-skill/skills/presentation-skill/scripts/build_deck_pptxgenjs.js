@@ -675,6 +675,7 @@ const PALETTE_LIBRARY = {
 
 const PRESET_TREATMENTS = {
   'executive-clinical': {
+    page_system: 'clinical-rail',
     header_mode: 'bar',
     title_layout: 'split-hero',
     title_motif: 'orbit',
@@ -683,8 +684,11 @@ const PRESET_TREATMENTS = {
     matrix_mode: 'cards',
     stats_mode: 'feature-left',
     cards_mode: 'feature-left',
+    image_sidebar_mode: 'evidence-mosaic',
+    comparison_mode: 'scorecard',
   },
   'data-heavy-boardroom': {
+    page_system: 'board-ledger',
     header_mode: 'eyebrow',
     title_layout: 'split-hero',
     title_motif: 'network',
@@ -693,8 +697,11 @@ const PRESET_TREATMENTS = {
     matrix_mode: 'open-quadrants',
     stats_mode: 'policy-bands',
     cards_mode: 'feature-left',
+    image_sidebar_mode: 'analysis-rail',
+    comparison_mode: 'scorecard',
   },
   'forest-research': {
+    page_system: 'lab-plate',
     header_mode: 'stack',
     title_layout: 'light-atlas',
     title_motif: 'editorial',
@@ -703,8 +710,11 @@ const PRESET_TREATMENTS = {
     matrix_mode: 'open-quadrants',
     stats_mode: 'policy-bands',
     cards_mode: 'staggered-row',
+    image_sidebar_mode: 'editorial-atlas',
+    comparison_mode: 'open-columns',
   },
   'sunset-investor': {
+    page_system: 'investor-thesis',
     header_mode: 'bar',
     title_layout: 'poster',
     title_motif: 'orbit',
@@ -713,8 +723,11 @@ const PRESET_TREATMENTS = {
     matrix_mode: 'open-quadrants',
     stats_mode: 'feature-left',
     cards_mode: 'feature-left',
+    image_sidebar_mode: 'evidence-mosaic',
+    comparison_mode: 'scorecard',
   },
   'lavender-ops': {
+    page_system: 'command-canvas',
     header_mode: 'eyebrow',
     title_layout: 'command-center',
     title_motif: 'network',
@@ -723,8 +736,11 @@ const PRESET_TREATMENTS = {
     matrix_mode: 'cards',
     stats_mode: 'policy-bands',
     cards_mode: 'staggered-row',
+    image_sidebar_mode: 'analysis-rail',
+    comparison_mode: 'scorecard',
   },
   'warm-terracotta': {
+    page_system: 'editorial-field',
     header_mode: 'stack',
     title_layout: 'masthead',
     title_motif: 'editorial',
@@ -733,8 +749,11 @@ const PRESET_TREATMENTS = {
     matrix_mode: 'open-quadrants',
     stats_mode: 'policy-bands',
     cards_mode: 'staggered-row',
+    image_sidebar_mode: 'editorial-atlas',
+    comparison_mode: 'open-columns',
   },
   'paper-journal': {
+    page_system: 'editorial-field',
     header_mode: 'stack',
     title_layout: 'masthead',
     title_motif: 'editorial',
@@ -742,8 +761,11 @@ const PRESET_TREATMENTS = {
     timeline_mode: 'open-events',
     title_subtitle_color: 'D9CBA8',
     section_subtitle_color: 'EFE5D0',
+    image_sidebar_mode: 'editorial-atlas',
+    comparison_mode: 'open-columns',
   },
   'editorial-minimal': {
+    page_system: 'editorial-field',
     header_mode: 'stack',
     title_layout: 'masthead',
     title_motif: 'editorial',
@@ -751,24 +773,33 @@ const PRESET_TREATMENTS = {
     timeline_mode: 'open-events',
     title_subtitle_color: 'E5E7EB',
     section_subtitle_color: 'E5E7EB',
+    image_sidebar_mode: 'editorial-atlas',
+    comparison_mode: 'open-columns',
   },
   'arctic-minimal': {
+    page_system: 'clinical-rail',
     header_mode: 'eyebrow',
     title_layout: 'light-atlas',
     title_motif: 'orbit',
     section_motif: 'rail-dots',
     matrix_mode: 'open-quadrants',
     stats_mode: 'policy-bands',
+    image_sidebar_mode: 'editorial-atlas',
+    comparison_mode: 'open-columns',
   },
   'bold-startup-narrative': {
+    page_system: 'investor-thesis',
     header_mode: 'bar',
     title_layout: 'poster',
     title_motif: 'orbit',
     section_motif: 'rail-dots',
     timeline_mode: 'chapter-spread',
     cards_mode: 'feature-left',
+    image_sidebar_mode: 'evidence-mosaic',
+    comparison_mode: 'scorecard',
   },
   'charcoal-safety': {
+    page_system: 'board-ledger',
     header_mode: 'bar',
     title_layout: 'command-center',
     title_motif: 'network',
@@ -777,16 +808,22 @@ const PRESET_TREATMENTS = {
     timeline_mode: 'bands',
     title_subtitle_color: 'D1D5DB',
     section_subtitle_color: 'E5E7EB',
+    image_sidebar_mode: 'analysis-rail',
+    comparison_mode: 'scorecard',
   },
   'midnight-neon': {
+    page_system: 'command-canvas',
     header_mode: 'bar',
     title_layout: 'command-center',
     title_motif: 'network',
     section_motif: 'rail-dots',
     timeline_mode: 'chapter-spread',
     cards_mode: 'feature-left',
+    image_sidebar_mode: 'evidence-mosaic',
+    comparison_mode: 'scorecard',
   },
   'lab-report': {
+    page_system: 'lab-plate',
     header_mode: 'lab-clean',
     header_variant: 'auto',
     header_variants: ['left-accent', 'split-rule', 'title-rule', 'side-rail', 'top-bottom-rule', 'plain'],
@@ -801,11 +838,14 @@ const PRESET_TREATMENTS = {
     section_motif: 'none',
     title_subtitle_color: 'D6E4F0',
     section_subtitle_color: 'D6E4F0',
+    image_sidebar_mode: 'evidence-mosaic',
+    comparison_mode: 'scorecard',
   },
 };
 
 const STYLE_ENUM_VALUES = {
   visual_density: new Set(['low', 'medium', 'high']),
+  page_system: new Set(['clinical-rail', 'board-ledger', 'editorial-field', 'command-canvas', 'lab-plate', 'investor-thesis', 'none']),
   header_mode: new Set(['bar', 'stack', 'eyebrow', 'lab-clean', 'lab-card']),
   header_variant: new Set([
     'auto',
@@ -843,11 +883,14 @@ const STYLE_ENUM_VALUES = {
   footer_mode: new Set(['standard', 'source-line', 'none']),
   summary_callout_mode: new Set(['default', 'lab-box']),
   figure_table_treatment: new Set(['figure-first', 'table-first', 'stats-strip', 'image-sidebar']),
+  image_sidebar_mode: new Set(['analysis-rail', 'evidence-mosaic', 'editorial-atlas']),
+  comparison_mode: new Set(['open-columns', 'scorecard']),
 };
 
 const ROOT_STYLE_ENUM_KEYS = Object.keys(STYLE_ENUM_VALUES);
 const SLIDE_STYLE_ENUM_KEYS = [
   'header_mode',
+  'page_system',
   'header_variant',
   'title_layout',
   'timeline_mode',
@@ -859,6 +902,8 @@ const SLIDE_STYLE_ENUM_KEYS = [
   'footer_mode',
   'summary_callout_mode',
   'figure_table_treatment',
+  'image_sidebar_mode',
+  'comparison_mode',
 ];
 
 function sortedSetValues(values) {
@@ -965,6 +1010,7 @@ function applyDeckStyle(basePreset, data, presetName) {
 
   for (const key of [
     'header_mode',
+    'page_system',
     'header_variant',
     'title_layout',
     'title_motif',
@@ -978,6 +1024,8 @@ function applyDeckStyle(basePreset, data, presetName) {
     'footer_mode',
     'summary_callout_mode',
     'figure_table_treatment',
+    'image_sidebar_mode',
+    'comparison_mode',
   ]) {
     const value = canonicalStyleValue(deckStyle, key, 'deck_style');
     if (value) preset[key] = value;
@@ -1185,9 +1233,11 @@ function renderSlide(pptx, pSlide, slide, preset) {
   // with a verdict already has a strip). Matches the python dispatcher.
   const variantForCallout = String(slide.variant || '').trim().toLowerCase();
   const hasVerdict = !!String(slide.verdict || '').trim();
+  const imageSidebarMode = String(slide.image_sidebar_mode || preset.image_sidebar_mode || '').trim().toLowerCase();
   const skipCallout =
     variantForCallout === 'kpi-hero' ||
     variantForCallout === 'generated-image' ||
+    (variantForCallout === 'image-sidebar' && ['evidence-mosaic', 'editorial-atlas'].includes(imageSidebarMode)) ||
     (variantForCallout === 'comparison-2col' && hasVerdict);
 
   // content variants

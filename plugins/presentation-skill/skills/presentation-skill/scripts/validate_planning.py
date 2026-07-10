@@ -35,6 +35,7 @@ SUPPORTED_TITLE_LAYOUTS = {
 }
 SUPPORTED_HEADER_MODES = {"bar", "stack", "eyebrow", "lab-clean", "lab-card"}
 SUPPORTED_VISUAL_DENSITIES = {"low", "medium", "high"}
+SUPPORTED_PAGE_SYSTEMS = {"clinical-rail", "board-ledger", "editorial-field", "command-canvas", "lab-plate", "investor-thesis", "none"}
 SUPPORTED_TITLE_MOTIFS = {"orbit", "network", "editorial", "none"}
 SUPPORTED_SECTION_MOTIFS = {"rail-dots", "numbered-tabs", "plain", "none"}
 SUPPORTED_TIMELINE_MODES = {"rail-cards", "staggered", "open-events", "bands", "chapter-spread"}
@@ -51,6 +52,8 @@ SUPPORTED_FIGURE_TREATMENTS = {
     "stats-strip",
     "image-sidebar",
 }
+SUPPORTED_IMAGE_SIDEBAR_MODES = {"analysis-rail", "evidence-mosaic", "editorial-atlas"}
+SUPPORTED_COMPARISON_MODES = {"open-columns", "scorecard"}
 STYLE_MIX_POOL_SPECS = (
     ("header_variant_pool", SUPPORTED_HEADER_VARIANTS, True),
     ("title_layout_pool", SUPPORTED_TITLE_LAYOUTS, False),
@@ -65,6 +68,9 @@ STYLE_MIX_POOL_SPECS = (
     ("summary_callout_pool", SUPPORTED_SUMMARY_CALLOUT_MODES | {"kpi-hero", "promote-card", "thin-rule-callout", "none"}, False),
     ("footer_pool", SUPPORTED_FOOTERS, False),
     ("figure_table_treatment_pool", SUPPORTED_FIGURE_TREATMENTS, False),
+    ("page_system_pool", SUPPORTED_PAGE_SYSTEMS, False),
+    ("image_sidebar_mode_pool", SUPPORTED_IMAGE_SIDEBAR_MODES, False),
+    ("comparison_mode_pool", SUPPORTED_COMPARISON_MODES, False),
 )
 TARGET_BOX_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:x|by)\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 MIN_FIGURE_TARGET_BOX_WIDTH = 3.0
@@ -2536,6 +2542,7 @@ def _validate_style_preset(brief: dict[str, Any]) -> list[dict[str, str]]:
 
 STYLE_TREATMENT_ENUMS = {
     "visual_density": SUPPORTED_VISUAL_DENSITIES,
+    "page_system": SUPPORTED_PAGE_SYSTEMS,
     "header_mode": SUPPORTED_HEADER_MODES,
     "header_variant": SUPPORTED_HEADER_VARIANTS,
     "title_layout": SUPPORTED_TITLE_LAYOUTS,
@@ -2550,6 +2557,8 @@ STYLE_TREATMENT_ENUMS = {
     "footer_mode": SUPPORTED_FOOTERS,
     "summary_callout_mode": SUPPORTED_SUMMARY_CALLOUT_MODES,
     "figure_table_treatment": SUPPORTED_FIGURE_TREATMENTS,
+    "image_sidebar_mode": SUPPORTED_IMAGE_SIDEBAR_MODES,
+    "comparison_mode": SUPPORTED_COMPARISON_MODES,
 }
 
 

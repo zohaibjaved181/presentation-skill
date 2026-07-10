@@ -25,6 +25,14 @@ version, and content-recipe signature.
 The same `header_mode: "lab-clean"` report chrome can be layered over other
 presets when a deck needs a boardroom, editorial, research, or journal palette
 but still wants restrained heading/accent-rule rhythm.
+Page-level structure can use `deck_style.page_system` or slide-level
+`page_system`: `clinical-rail`, `board-ledger`, `editorial-field`,
+`command-canvas`, `lab-plate`, or `investor-thesis`. Presets provide a stable
+default, while slide overrides let the agent change structural grammar when
+the content job changes.
+`image-sidebar` supports `analysis-rail`, `evidence-mosaic`, and
+`editorial-atlas` through `image_sidebar_mode`. `comparison-2col` supports
+`open-columns` and metric-led `scorecard` through `comparison_mode`.
 Chart slides can use `deck_style.chart_treatment` or slide-level
 `chart_treatment` to choose `standard`, `facts-below`, `facts-right`,
 `minimal`, `hero-stat`, `threshold-band`, or `sparse-wide` chart compositions

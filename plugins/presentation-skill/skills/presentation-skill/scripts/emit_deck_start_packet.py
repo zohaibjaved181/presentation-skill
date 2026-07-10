@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -62,6 +63,9 @@ DATA_HINTS = (
 
 RESEARCH_HINTS = (
     "research",
+    "evidence",
+    "evidence-backed",
+    "source-backed",
     "sources",
     "citations",
     "refs",
@@ -76,9 +80,6 @@ RESEARCH_HINTS = (
 )
 
 PPTX_STYLE_HINTS = (
-    ".pptx",
-    "powerpoint",
-    "template",
     "reference deck",
     "example deck",
     "style extraction",
@@ -86,6 +87,11 @@ PPTX_STYLE_HINTS = (
     "branded deck",
     "brand deck",
     "existing deck",
+    "attached template",
+    "uploaded template",
+    "provided template",
+    "use this template",
+    "match this deck",
 )
 
 SOURCE_FOOTER_HINTS = (
@@ -179,7 +185,15 @@ def _workspace_style_preset(workspace: Path | None) -> str:
 
 
 def _pptx_style_likely(*, workspace: Path | None, user_prompt: str) -> bool:
-    return bool(_workspace_reference_pptx(workspace)) or _contains_any(user_prompt, PPTX_STYLE_HINTS)
+    if _workspace_reference_pptx(workspace) or _contains_any(user_prompt, PPTX_STYLE_HINTS):
+        return True
+    return bool(
+        re.search(
+            r"\b(attached|uploaded|provided|reference|existing|template)\b[^\n]{0,100}\.pptx\b",
+            user_prompt,
+            re.IGNORECASE,
+        )
+    )
 
 
 def _pptx_style_input(workspace: Path | None) -> str:

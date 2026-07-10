@@ -16,6 +16,7 @@ from pptx import Presentation
 
 from design_tokens import PRESETS
 from emit_deck_start_packet import build_packet
+from model_adaptive_workflow import PROFILE_ALIASES, write_agent_brief
 from style_reference_catalog import LAYOUT_PLAYBOOK_VERSION, preset_style_reference
 from style_treatment_profiles import preset_treatment_profile
 from workflow_atom_context import build_workflow_atom_context, compact_workflow_atom_context
@@ -1381,6 +1382,15 @@ def _args() -> argparse.Namespace:
         help="Question set size for the optional deck-start packet.",
     )
     parser.add_argument(
+        "--agent-profile",
+        choices=sorted(PROFILE_ALIASES),
+        default="auto",
+        help=(
+            "Model-side execution profile for the compact agent brief. "
+            "Use auto, quality-first/sol, balanced/terra, or fast/luna."
+        ),
+    )
+    parser.add_argument(
         "--followup-edit",
         action="store_true",
         help=(
@@ -1530,6 +1540,8 @@ def main() -> int:
     }
     if emit_start_packet:
         workspace_manifest["deck_start_packet"] = _display_path(workspace, start_packet_path)
+        workspace_manifest["agent_brief"] = "agent_brief.json"
+        workspace_manifest["agent_brief_markdown"] = "agent_brief.md"
 
     _write_text(workspace / "outline.json", json.dumps(outline, indent=2, ensure_ascii=False) + "\n")
     _write_text(
@@ -1567,12 +1579,19 @@ def main() -> int:
             start_packet_path,
             json.dumps(packet, indent=2, ensure_ascii=False) + "\n",
         )
+        write_agent_brief(
+            packet=packet,
+            workspace=workspace,
+            user_prompt=user_prompt or args.title,
+            requested_profile=args.agent_profile,
+        )
 
     print(f"Workspace created: {workspace}")
     print(f"Outline: {workspace / 'outline.json'}")
     print(f"Style contract: {workspace / 'style_contract.json'}")
     if emit_start_packet:
         print(f"Deck start packet: {start_packet_path}")
+        print(f"Agent brief: {workspace / 'agent_brief.md'}")
     print(f"Build target: {workspace / 'build' / f'{slug}.pptx'}")
     return 0
 

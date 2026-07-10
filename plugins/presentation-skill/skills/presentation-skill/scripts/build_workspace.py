@@ -1196,6 +1196,7 @@ _DECK_STYLE_SCALAR_KEYS = {
     "font_pair",
     "style_seed",
     "visual_density",
+    "page_system",
     "header_mode",
     "header_variant",
     "header_rule_color",
@@ -1213,10 +1214,13 @@ _DECK_STYLE_SCALAR_KEYS = {
     "footer_refs_label",
     "summary_callout_mode",
     "figure_table_treatment",
+    "image_sidebar_mode",
+    "comparison_mode",
 }
 
 _STYLE_ENUM_VALUES = {
     "visual_density": {"low", "medium", "high"},
+    "page_system": {"clinical-rail", "board-ledger", "editorial-field", "command-canvas", "lab-plate", "investor-thesis", "none"},
     "header_mode": {"bar", "stack", "eyebrow", "lab-clean", "lab-card"},
     "header_variant": {
         "auto",
@@ -1246,6 +1250,8 @@ _STYLE_ENUM_VALUES = {
     "footer_mode": {"standard", "source-line", "none"},
     "summary_callout_mode": {"default", "lab-box"},
     "figure_table_treatment": {"figure-first", "table-first", "stats-strip", "image-sidebar"},
+    "image_sidebar_mode": {"analysis-rail", "evidence-mosaic", "editorial-atlas"},
+    "comparison_mode": {"open-columns", "scorecard"},
 }
 
 _LAB_HEADER_VARIANTS = (
@@ -1540,6 +1546,7 @@ def _deck_style_from_design_brief(brief: Any) -> dict[str, Any]:
     if header_pool and "header_variant" not in style:
         style["header_variant"] = "auto"
     for style_key, pool_key in (
+        ("page_system", "page_system_pool"),
         ("title_layout", "title_layout_pool"),
         ("section_motif", "section_motif_pool"),
         ("timeline_mode", "timeline_mode_pool"),
@@ -1550,6 +1557,8 @@ def _deck_style_from_design_brief(brief: Any) -> dict[str, Any]:
         ("table_treatment", "table_treatment_pool"),
         ("summary_callout_mode", "summary_callout_mode_pool"),
         ("figure_table_treatment", "figure_table_treatment_pool"),
+        ("image_sidebar_mode", "image_sidebar_mode_pool"),
+        ("comparison_mode", "comparison_mode_pool"),
         ("footer_mode", "footer_pool"),
     ):
         _apply_seeded_style_pool(
